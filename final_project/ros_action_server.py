@@ -14,12 +14,13 @@ import threading  # <-- Added to handle blocking action calls safely
 from math import atan2, sqrt
 import numpy as np
 from control_msgs.action import FollowJointTrajectory
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import PoseStamped, TransformStamped
 from rclpy.action import ActionClient
 from rclpy.duration import Duration
 from rclpy.time import Time
 from trajectory_msgs.msg import JointTrajectoryPoint
 from action_msgs.msg import GoalStatus
+from stretch_nav2.robot_navigator import BasicNavigator, TaskResult
 
 CAN_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco_data/trash_start.json" # this is how stretch approaches the can
 CAN_PICKUP_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/joint_state_data/trash_pickup.json" # this is the extraction poses
@@ -27,6 +28,15 @@ RECEPTACLE_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco
 
 TRASH_CAN_OFFSET_ORIENTATION = np.pi
 RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
+
+# Hardcoded map-frame waypoints for navigating to the receptacle.
+# Each entry is [x, y, orientation_w]. orientation_w=1.0 means no rotation.
+# TODO: replace with real coordinates from your map.
+RECEPTACLE_WAYPOINTS = [
+    [0.0, 0.0, 1.0],
+    [1.0, 1.0, 1.0],
+    [2.0, 2.0, 1.0],
+]
 
 class WasteDisposal(Node):
     def __init__(self):
@@ -49,7 +59,7 @@ class WasteDisposal(Node):
         if not self.trajectory_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Unable to connect to trajectory server.")
             
-        # Subscribers
+        # Subscriber
         self.subscription = self.create_subscription(
             String,
             'task_execution',
@@ -295,9 +305,59 @@ class WasteDisposal(Node):
             drop_pose = poses["receptacle_drop"]
             self.execute_named_pose_from_dict(drop_pose)
 
+    def execute_go_to_receptacle(self):
+        """
+        Use Nav2 to navigate through RECEPTACLE_WAYPOINTS in sequence.
+        Blocks until all waypoints are visited, navigation fails, or is cancelled.
+        Returns True on success, False otherwise.
+        """
+        self.get_logger().info("Waiting for Nav2 to become active...")
+        self.navigator.waitUntilNav2Active()
+
+        # Build the list of PoseStamped waypoints from the constants at the top
+        route_poses = []
+        for x, y, w in RECEPTACLE_WAYPOINTS:
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.header.stamp = self.navigator.get_clock().now().to_msg()
+            pose.pose.position.x = x
+            pose.pose.position.y = y
+            pose.pose.orientation.w = w
+            route_poses.append(pose)
+
+        self.get_logger().info(
+            f"Following {len(route_poses)} waypoints to receptacle..."
+        )
+        self.navigator.followWaypoints(route_poses)
+
+        # Block until Nav2 finishes, logging current waypoint along the way
+        i = 0
+        while not self.navigator.isTaskComplete():
+            i += 1
+            feedback = self.navigator.getFeedback()
+            if feedback and i % 5 == 0:
+                self.get_logger().info(
+                    f"Executing waypoint {feedback.current_waypoint + 1}/{len(route_poses)}"
+                )
+
+        result = self.navigator.getResult()
+        if result == TaskResult.SUCCEEDED:
+            self.get_logger().info("Navigation to receptacle succeeded.")
+            return True
+        elif result == TaskResult.CANCELED:
+            self.get_logger().warn("Navigation to receptacle was cancelled.")
+            return False
+        elif result == TaskResult.FAILED:
+            self.get_logger().error("Navigation to receptacle failed.")
+            return False
+        else:
+            self.get_logger().error(f"Navigation to receptacle returned unknown result: {result}")
+            return False
+
     def execute_sequence(self):
         self.get_logger().info("Starting automatic sequence: Extraction -> Disposal")
         self.execute_extraction()
+        self.execute_go_to_receptacle()
         self.execute_disposal()
         self.get_logger().info("Automatic sequence completed.")
 
