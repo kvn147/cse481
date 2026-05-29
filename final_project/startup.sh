@@ -54,11 +54,15 @@ tmux send-keys -t "$SESSION:web_video_server" "ros2 run web_video_server web_vid
 tmux new-window -t "$SESSION" -n 'webserver'
 tmux send-keys -t "$SESSION:webserver" "cd ${WEB_DIR}/frontend && python3 -m http.server 8000" C-m
 
-# Terminal 7: action_server
+# Terminal 7: Nav2 with map
+tmux new-window -t "$SESSION" -n 'map'
+tmux send-keys -t "$SESSION:map" "ros2 launch stretch_nav2 navigation.launch.py map:=${WEB_DIR}/maps/mango_map_room_correct.yaml" C-m
+
+# Terminal 8: action_server
 tmux new-window -t "$SESSION" -n 'action_server'
 tmux send-keys -t "$SESSION:action_server" "cd ${WEB_DIR} && python3 ros_action_server.py" C-m
 
-# Terminal 8: keyboard_teleop
+# Terminal 9: keyboard_teleop
 tmux new-window -t "$SESSION" -n 'keyboard_teleop'
 tmux send-keys -t "$SESSION:keyboard_teleop" "ros2 run stretch_core keyboard_teleop" C-m
 
