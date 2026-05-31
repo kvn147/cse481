@@ -11,10 +11,10 @@
 
     <div class="controls">
       <button class="primary" onclick="executeTask('sequence')">Start Automatic Disposal</button>
-      <!-- <button id="stopBtn" class="danger" onclick="estop()">Pause / Emergency Stop</button> -->
+      <button id="stopBtn" class="danger" onclick="estop()">Pause / Emergency Stop</button>
       <button onclick="executeTask('extraction')">Execute Extraction</button>
       <button onclick="executeTask('disposal')">Execute Disposal</button>
-      <button class="secondary" onclick="executeTask('reset')">Reset Robot (Stow)</button>
+      <button class="secondary" onclick="executeTask('reset')">Reset Robot (Neutral Position)</button>
       <button class="secondary" onclick="executeTask('locate_can')">Locate Garbage Can</button> 
       <button class="secondary" onclick="executeTask('collect')">[FUTURE] Trash Collection</button>
     </div>
@@ -27,11 +27,7 @@
     </div>
 
     <div class="camera-feed" id="video">
-      <!-- 
-        If web_video_server is running:
-        <img src="http://slinky.hcrlab.cs.washington.edu:8080/stream?topic=/camera/color/image_raw"> 
-      -->
-      No Camera Feed Detected
+        <img src="http://rocky.hcrlab.cs.washington.edu:8080/stream?topic=/camera/color/image_raw"> 
     </div>
     </div>
 
@@ -48,7 +44,7 @@
     });
 
     const statusText = document.getElementById("status");
-    // const stopBtn = document.getElementById("stopBtn");
+    const stopBtn = document.getElementById("stopBtn");
 
     ros.on('connection', () => {
       statusText.innerText = "Connected to Stretch";
@@ -67,12 +63,10 @@
 
     function executeTask(taskType) {
       // Reset stop button appearance
-      /*
       if (typeof stopBtn !== 'undefined' && stopBtn) {
         stopBtn.innerText = "Pause / Emergency Stop";
         stopBtn.style.backgroundColor = "#e74c3c";
       }
-      */
 
       const msg = new ROSLIB.Message({
         data: taskType
@@ -82,7 +76,6 @@
       console.log("Published task:", taskType);
     }
 
-    /*
     function estop() {
       // Change button appearance to "Paused"
       if (typeof stopBtn !== 'undefined' && stopBtn) {
@@ -111,7 +104,6 @@
       statusText.innerText = "Status: EMERGENCY STOP SENT";
       statusText.style.color = "#e74c3c";
     }
-    */
     </script>
 
 </body>

@@ -36,7 +36,7 @@ tmux send-keys -t "$SESSION:camera" "ros2 launch stretch_core d435i_high_resolut
 
 # Terminal 3: aruco
 tmux new-window -t "$SESSION" -n 'aruco'
-tmux send-keys -t "$SESSION:aruco" "ros2 launch stretch_core stretch_aruco.launch.py" C-m
+tmux send-keys -t "$SESSION:aruco" "ros2 launch stretch_core stretch_aruco.launch.py aruco_marker_file:=${WEB_DIR}/../trash_markers.yaml" C-m
 
 # Terminal 4: rviz
 tmux new-window -t "$SESSION" -n 'rviz'
@@ -45,6 +45,10 @@ tmux send-keys -t "$SESSION:rviz" "ros2 run rviz2 rviz2 -d /home/hello-robot/ame
 # Terminal 5: rosbridge
 tmux new-window -t "$SESSION" -n 'rosbridge'
 tmux send-keys -t "$SESSION:rosbridge" "ros2 launch rosbridge_server rosbridge_websocket_launch.xml" C-m
+
+# publish to camera topic
+tmux new-window -t "$SESSION" -n 'web_video_server'
+tmux send-keys -t "$SESSION:web_video_server" "ros2 run web_video_server web_video_server" C-m
 
 # Terminal 6: web server
 tmux new-window -t "$SESSION" -n 'webserver'

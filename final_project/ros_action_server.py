@@ -42,6 +42,8 @@ class WasteDisposal(Node):
             "/stretch_controller/follow_joint_trajectory",
         )
 
+        self._goal_handle = None
+
         if not self.trajectory_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Unable to connect to trajectory server.")
             
@@ -93,17 +95,19 @@ class WasteDisposal(Node):
         while not send_goal_future.done():
             time.sleep(0.1)
             
-        goal_handle = send_goal_future.result()
+        self._goal_handle = send_goal_future.result()
 
-        if not goal_handle.accepted:
+        if not self._goal_handle.accepted:
             self.get_logger().error(f"Goal for joints [{joint_names_str}] was rejected!")
+            self._goal_handle = None
             return False
 
-        result_future = goal_handle.get_result_async()
+        result_future = self._goal_handle.get_result_async()
         while not result_future.done():
             time.sleep(0.1)
             
         result = result_future.result()
+        self._goal_handle = None
 
         if result.status != GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().warn(f"Goal for joints [{joint_names_str}] did not succeed: status {result.status}")
@@ -293,11 +297,14 @@ class WasteDisposal(Node):
         ]
         self.send_base_goal_blocking(joints_list)
 
-    # def execute_stop(self):
-    #     self.get_logger().warn("Stop requested! Halting immediately.")
-    #     if self.trajectory_client:
-    #         self.get_logger().info("Attempting to cancel current trajectory...")
-
+    def execute_stop(self):
+        self.get_logger().warn("Stop requested! Halting immediately.")
+        if self._goal_handle:
+            self.get_logger().info("Attempting to cancel current trajectory...")
+            self._goal_handle.cancel_goal_async()
+            self._goal_handle = None
+        else:
+            self.get_logger().info("No active trajectory to cancel.")
            
 def main(args=None):
     rclpy.init(args=args)
