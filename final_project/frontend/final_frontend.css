@@ -52,12 +52,20 @@ button.secondary:hover {
 }
 button.danger { 
     background-color: #e74c3c; 
-    grid-column: span 2; 
     font-weight: bold; 
     font-size: 18px;
 }
 button.danger:hover { 
     background-color: #c0392b; 
+}
+button.warning { 
+    background-color: #f1c40f; 
+    color: #333;
+    font-weight: bold; 
+    font-size: 18px;
+}
+button.warning:hover { 
+    background-color: #f39c12; 
 }
 button.primary { 
     background-color: #2ecc71; 

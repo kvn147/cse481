@@ -43,6 +43,8 @@ class WasteDisposal(Node):
         )
 
         self._goal_handle = None
+        self._abort_requested = False
+        self._is_paused = False
 
         if not self.trajectory_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Unable to connect to trajectory server.")
@@ -66,6 +68,10 @@ class WasteDisposal(Node):
             self.get_logger().error(f"Unknown task type: {task_type}")
             return
         
+        if task_type not in ["stop", "pause", "resume"]:
+            self._abort_requested = False
+            self._is_paused = False
+        
         # Run execution in a separate background thread so rclpy.spin() doesn't deadlock
         threading.Thread(target=handler, daemon=True).start()
 
@@ -78,6 +84,16 @@ class WasteDisposal(Node):
             return {}
 
     def send_base_goal_blocking(self, joints_list):
+        # Wait if paused
+        while self._is_paused:
+            time.sleep(0.1)
+            if self._abort_requested:
+                return False
+
+        if self._abort_requested:
+            self.get_logger().warn("Task aborted! Skipping trajectory execution.")
+            return False
+
         point = JointTrajectoryPoint()
         point.positions = [float(inc) for _, inc in joints_list]
         point.time_from_start = Duration(seconds=5.0).to_msg()
@@ -299,12 +315,21 @@ class WasteDisposal(Node):
 
     def execute_stop(self):
         self.get_logger().warn("Stop requested! Halting immediately.")
+        self._abort_requested = True
         if self._goal_handle:
             self.get_logger().info("Attempting to cancel current trajectory...")
             self._goal_handle.cancel_goal_async()
             self._goal_handle = None
         else:
             self.get_logger().info("No active trajectory to cancel.")
+
+    def execute_pause(self):
+        self.get_logger().info("Pause requested.")
+        self._is_paused = True
+
+    def execute_resume(self):
+        self.get_logger().info("Resume requested.")
+        self._is_paused = False
            
 def main(args=None):
     rclpy.init(args=args)

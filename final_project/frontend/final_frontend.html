@@ -11,7 +11,8 @@
 
     <div class="controls">
       <button class="primary" onclick="executeTask('sequence')">Start Automatic Disposal</button>
-      <button id="stopBtn" class="danger" onclick="estop()">Pause / Emergency Stop</button>
+      <button id="pauseBtn" class="warning" onclick="togglePause()">Pause Task</button>
+      <button id="stopBtn" class="danger" onclick="estop()">Emergency Stop</button>
       <button onclick="executeTask('extraction')">Execute Extraction</button>
       <button onclick="executeTask('disposal')">Execute Disposal</button>
       <button class="secondary" onclick="executeTask('reset')">Reset Robot (Neutral Position)</button>
@@ -45,6 +46,9 @@
 
     const statusText = document.getElementById("status");
     const stopBtn = document.getElementById("stopBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+
+    let isPaused = false;
 
     ros.on('connection', () => {
       statusText.innerText = "Connected to Stretch";
@@ -62,11 +66,16 @@
     });
 
     function executeTask(taskType) {
-      // Reset stop button appearance
-      if (typeof stopBtn !== 'undefined' && stopBtn) {
-        stopBtn.innerText = "Pause / Emergency Stop";
+      // Reset button appearances
+      if (stopBtn) {
+        stopBtn.innerText = "Emergency Stop";
         stopBtn.style.backgroundColor = "#e74c3c";
       }
+      if (pauseBtn) {
+        pauseBtn.innerText = "Pause Task";
+        pauseBtn.style.backgroundColor = "#f1c40f"; // Standard warning yellow
+      }
+      isPaused = false;
 
       const msg = new ROSLIB.Message({
         data: taskType
@@ -76,11 +85,27 @@
       console.log("Published task:", taskType);
     }
 
+    function togglePause() {
+      isPaused = !isPaused;
+      const task = isPaused ? 'pause' : 'resume';
+      
+      if (pauseBtn) {
+        pauseBtn.innerText = isPaused ? "Resume Task" : "Pause Task";
+        pauseBtn.style.backgroundColor = isPaused ? "#27ae60" : "#f1c40f";
+      }
+
+      const msg = new ROSLIB.Message({
+        data: task
+      });
+      taskTopic.publish(msg);
+      statusText.innerText = "Status: " + (isPaused ? "PAUSED" : "RESUMING...");
+    }
+
     function estop() {
-      // Change button appearance to "Paused"
-      if (typeof stopBtn !== 'undefined' && stopBtn) {
-        stopBtn.innerText = "PAUSED";
-        stopBtn.style.backgroundColor = "#d35400";
+      // Change button appearance to "ABORTED"
+      if (stopBtn) {
+        stopBtn.innerText = "ABORTED";
+        stopBtn.style.backgroundColor = "#c0392b"; // Harder red
       }
 
       // Send stop command to task execution
@@ -101,7 +126,7 @@
       });
       cmdVel.publish(stopMsg);
 
-      statusText.innerText = "Status: EMERGENCY STOP SENT";
+      statusText.innerText = "Status: EMERGENCY STOP SENT (ABORTED)";
       statusText.style.color = "#e74c3c";
     }
     </script>
