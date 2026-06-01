@@ -25,7 +25,7 @@ CAN_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco_data/t
 CAN_PICKUP_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/joint_state_data/trash_pickup.json" # this is the extraction poses
 RECEPTACLE_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco_data/receptacle_start.json" # this is the approach pose for the receptacle
 
-TRASH_CAN_OFFSET_ORIENTATION = np.pi + np.pi/4 # added np.pi/4 because friction and turning issues
+TRASH_CAN_OFFSET_ORIENTATION = np.pi
 RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
 
 class WasteDisposal(Node):
