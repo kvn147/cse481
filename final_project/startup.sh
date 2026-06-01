@@ -62,4 +62,7 @@ tmux send-keys -t "$SESSION:action_server" "cd ${WEB_DIR} && python3 ros_action_
 tmux new-window -t "$SESSION" -n 'keyboard_teleop'
 tmux send-keys -t "$SESSION:keyboard_teleop" "ros2 run stretch_core keyboard_teleop" C-m
 
+# doing too much
+tmux new-window -t "$SESSION" -n 'cloudflare'
+tmux send-keys -t "$SESSION:cloudflare" "cloudflared tunnel run --token $(cat ${WEB_DIR}/../../cloudflare_token.txtc)" C-m
 tmux attach-session -t "$SESSION"
