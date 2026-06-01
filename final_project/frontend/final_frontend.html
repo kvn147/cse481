@@ -28,14 +28,13 @@
     </div>
 
     <div class="camera-feed" id="video">
-        <img src="http://rocky.hcrlab.cs.washington.edu:8080/stream?topic=/camera/color/image_raw"> 
+        <img src="https://video.kevinn.me/stream?topic=/camera/color/image_raw"> 
     </div>
     </div>
 
     <script>
     const ros = new ROSLIB.Ros({
-      url: "ws://rocky.hcrlab.cs.washington.edu:9090"
-      //url: "ws://slinky.hcrlab.cs.washington.edu:9090"
+      url: "wss://ros.kevinn.me"
     });
 
     const taskTopic = new ROSLIB.Topic({
