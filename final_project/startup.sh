@@ -52,7 +52,7 @@ tmux send-keys -t "$SESSION:web_video_server" "ros2 run web_video_server web_vid
 
 # Terminal 6: web server
 tmux new-window -t "$SESSION" -n 'webserver'
-tmux send-keys -t "$SESSION:webserver" "cd ${WEB_DIR} && python3 -m http.server 8000" C-m
+tmux send-keys -t "$SESSION:webserver" "cd ${WEB_DIR}/frontend && python3 -m http.server 8000" C-m
 
 # Terminal 7: action_server
 tmux new-window -t "$SESSION" -n 'action_server'
