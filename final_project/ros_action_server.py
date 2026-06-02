@@ -111,7 +111,7 @@ class WasteDisposal(Node):
         
     def switch_mode(self, mode):
         """Call /stretch/switch_to_position_mode or navigation_mode. mode='position' or 'navigation'"""
-        service_name = f"/stretch/switch_to_{mode}_mode"
+        service_name = f"/switch_to_{mode}_mode"
         client = self.create_client(Trigger, service_name)
         
         if not client.wait_for_service(timeout_sec=5.0):
@@ -119,7 +119,8 @@ class WasteDisposal(Node):
             return False
         
         future = client.call_async(Trigger.Request())
-        rclpy.spin_until_future_complete(self, future)
+        while not future.done():
+            time.sleep(0.1)
         
         result = future.result()
         if result.success:
@@ -128,15 +129,25 @@ class WasteDisposal(Node):
             self.get_logger().warn(f"Switch to {mode} mode failed: {result.message}")
         return result.success
 
-    def send_base_goal_blocking(self, joints_list, duration_sec=5.0):
+    def send_base_goal_blocking(self, joints_list, duration=5.0):
+        # Wait if paused
+        while self._is_paused:
+            time.sleep(0.1)
+            if self._abort_requested:
+                return False
+
+        if self._abort_requested:
+            self.get_logger().warn("Task aborted! Skipping trajectory execution.")
+            return False
 
         point = JointTrajectoryPoint()
         point.positions = [float(inc) for _, inc in joints_list]
-        point.time_from_start = Duration(seconds=duration_sec).to_msg()
+        point.time_from_start = Duration(seconds=5.0).to_msg()
 
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = [joint_name for joint_name, _ in joints_list]
         goal.trajectory.points = [point]
+        goal.goal_time_tolerance = Duration(seconds=10.0).to_msg()
 
         joint_names_str = ", ".join(goal.trajectory.joint_names)
         self.get_logger().info(f"Sending goal for joints: [{joint_names_str}]")
@@ -230,7 +241,7 @@ class WasteDisposal(Node):
 
         # Split base goals because they are mutually exclusive in the hardware controller
         self.send_base_goal_blocking([("rotate_mobile_base", phi)])
-        self.send_base_goal_blocking([("translate_mobile_base", dist)])
+        self.send_base_goal_blocking([("translate_mobile_base", dist)], 30.0)
         self.send_base_goal_blocking([("rotate_mobile_base", final_theta)])
         return True
 
