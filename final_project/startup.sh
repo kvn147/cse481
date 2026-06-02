@@ -30,10 +30,6 @@ tmux set-option -t "$SESSION:driver" allow-rename off
 tmux new-window -t "$SESSION" -n 'camera'
 tmux send-keys -t "$SESSION:camera" "ros2 launch stretch_core d435i_high_resolution.launch.py" C-m
 
-# Terminal 3: aruco
-tmux new-window -t "$SESSION" -n 'aruco'
-tmux send-keys -t "$SESSION:aruco" "ros2 launch stretch_core stretch_aruco.launch.py aruco_marker_file:=${WEB_DIR}/../trash_markers.yaml" C-m
-
 # Terminal 4: rviz
 tmux new-window -t "$SESSION" -n 'rviz'
 tmux send-keys -t "$SESSION:rviz" "ros2 run rviz2 rviz2 -d /home/hello-robot/ament_ws/src/stretch_tutorials/rviz/aruco_detector_example.rviz" C-m
@@ -53,6 +49,10 @@ tmux send-keys -t "$SESSION:webserver" "cd ${WEB_DIR}/frontend && python3 -m htt
 # Terminal 7: Nav2 with map
 tmux new-window -t "$SESSION" -n 'map'
 tmux send-keys -t "$SESSION:map" "ros2 launch stretch_nav2 navigation.launch.py map:=${WEB_DIR}/maps/mango_map_room_correct.yaml params_file:=/home/hello-robot/ament_ws/src/stretch_ros2/stretch_nav2/config/nav2_params.yaml autostart:=true" C-m
+
+# Terminal 3: aruco
+tmux new-window -t "$SESSION" -n 'aruco'
+tmux send-keys -t "$SESSION:aruco" "ros2 launch stretch_core stretch_aruco.launch.py aruco_marker_file:=${WEB_DIR}/../trash_markers.yaml" C-m
 
 # Terminal 8: action_server
 tmux new-window -t "$SESSION" -n 'action_server'
