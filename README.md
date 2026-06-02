@@ -22,3 +22,7 @@ Terminal 8 (optional): Keyboard teleop
 
 cd /home/hello-robot/kevin/cse481/final_project && python3 ros_action_server.py
 ros2 topic pub --once /task_execution std_msgs/msg/String "data: 'disposal'"
+
+ros2 launch stretch_core stretch_driver.launch.py mode:=navigation broadcast_odom_tf:=True
+
+tmux kill-server
