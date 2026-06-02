@@ -34,14 +34,15 @@ RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
 # Each entry is [x, y, orientation_w]. orientation_w=1.0 means no rotation.
 # TODO: replace with real coordinates from your map.
 RECEPTACLE_WAYPOINTS = [
-    [2.55, 0.86],
-    [3.38, -0.68],
-    [4.55, -1.41],
-    [5.21, -2.26],
-    [5.64, -4.91]
+    [2.55, 0.86], # by trash
+    [3.38, -0.75], # by table straight from trash
+    [4.19, -1.0], # by table right after
+    [5.21, -2.3438], #in doorway
+    [5.64, -4.91]  # looking at receptacle
 ]
 
 #final orientation: 0; 0; 0.231, 0.95
+# starting orientation: 0.46794; 0.88376; 3.2462e-06; 1.7188e-06
 
 class WasteDisposal(Node):
     def __init__(self):
@@ -352,6 +353,17 @@ class WasteDisposal(Node):
         """
         self.switch_mode("navigation")
 
+        # Set our demo's initial pose
+        initial_pose = PoseStamped()
+        initial_pose.header.frame_id = 'map'
+        initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+        initial_pose.pose.position.x = 2.55
+        initial_pose.pose.position.y = 0.86
+        initial_pose.pose.orientation.z = 0.9426348805427551
+        initial_pose.pose.orientation.w = -0.33381861448287964
+
+        self.navigator.setInitialPose(initial_pose)
+
         self.get_logger().info("Waiting for Nav2 to become active...")
         self.navigator.waitUntilNav2Active()
 
@@ -439,11 +451,17 @@ class WasteDisposal(Node):
 def main(args=None):
     rclpy.init(args=args)
     waste_disposal = WasteDisposal()
+
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(waste_disposal)
+    executor.add_node(waste_disposal.navigator)
+
     try:
-        rclpy.spin(waste_disposal)
+        executor.spin()
     except KeyboardInterrupt:
         pass
-    waste_disposal.destroy_node()
+
+    waste_disposal._nav_executor.shutdown()
     rclpy.shutdown()
 
 if __name__ == '__main__':
