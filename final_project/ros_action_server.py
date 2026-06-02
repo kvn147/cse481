@@ -36,7 +36,7 @@ RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
 RECEPTACLE_WAYPOINTS = [
     [2.55, 0.86], # by trash
     [3.38, -0.75], # by table straight from trash
-    [4.19, -1.0], # by table right after
+    [4.19, -1.5], # by table right after
     [5.21, -2.3438], #in doorway
     [5.64, -4.91]  # looking at receptacle
 ]
@@ -308,7 +308,7 @@ class WasteDisposal(Node):
             if self.align_to_marker(target_frame, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION):
                 self.execute_named_pose_from_dict(pose)
         
-        self.send_base_goal_blocking([("translate_mobile_base", -0.1)])
+        self.send_base_goal_blocking([("translate_mobile_base", -0.02)])
 
         # Extraction
         self.get_logger().info("Executing extraction (picking up trash)...")
