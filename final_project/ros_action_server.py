@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 import tf2_ros
 from tf2_ros import TransformException, Buffer, TransformListener
 from tf_transformations import euler_from_quaternion, quaternion_matrix
+from std_srvs.srv import Trigger
 
 import sys
 import time
@@ -33,10 +34,14 @@ RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
 # Each entry is [x, y, orientation_w]. orientation_w=1.0 means no rotation.
 # TODO: replace with real coordinates from your map.
 RECEPTACLE_WAYPOINTS = [
-    [0.0, 0.0, 1.0],
-    [1.0, 1.0, 1.0],
-    [2.0, 2.0, 1.0],
+    [2.55, 0.86],
+    [3.38, -0.68],
+    [4.55, -1.41],
+    [5.21, -2.26],
+    [5.64, -4.91]
 ]
+
+#final orientation: 0; 0; 0.231, 0.95
 
 class WasteDisposal(Node):
     def __init__(self):
@@ -103,6 +108,25 @@ class WasteDisposal(Node):
         except Exception as e:
             self.get_logger().error(f"Could not load poses from {file_path}: {e}")
             return {}
+        
+    def switch_mode(self, mode):
+        """Call /stretch/switch_to_position_mode or navigation_mode. mode='position' or 'navigation'"""
+        service_name = f"/stretch/switch_to_{mode}_mode"
+        client = self.create_client(Trigger, service_name)
+        
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error(f"Service {service_name} not available!")
+            return False
+        
+        future = client.call_async(Trigger.Request())
+        rclpy.spin_until_future_complete(self, future)
+        
+        result = future.result()
+        if result.success:
+            self.get_logger().info(f"Switched to {mode} mode: {result.message}")
+        else:
+            self.get_logger().warn(f"Switch to {mode} mode failed: {result.message}")
+        return result.success
 
     def send_base_goal_blocking(self, joints_list, duration_sec=5.0):
 
@@ -259,6 +283,8 @@ class WasteDisposal(Node):
         return self.send_base_goal_blocking(joints_list)
 
     def execute_extraction(self):
+        self.switch_mode("position")
+
         # Approach
         self.get_logger().info("Executing navigation (approaching trash can)...")
         start_poses = self.load_poses(CAN_START_POSE_FILE)
@@ -283,6 +309,8 @@ class WasteDisposal(Node):
                 time.sleep(5.0)
 
     def execute_disposal(self):
+        self.switch_mode("position")
+
         # Approach
         self.get_logger().info("Executing navigation (approaching receptacle)...")
         poses = self.load_poses(RECEPTACLE_START_POSE_FILE)
@@ -311,18 +339,20 @@ class WasteDisposal(Node):
         Blocks until all waypoints are visited, navigation fails, or is cancelled.
         Returns True on success, False otherwise.
         """
+        self.switch_mode("navigation")
+
         self.get_logger().info("Waiting for Nav2 to become active...")
         self.navigator.waitUntilNav2Active()
 
         # Build the list of PoseStamped waypoints from the constants at the top
         route_poses = []
-        for x, y, w in RECEPTACLE_WAYPOINTS:
+        for x, y in RECEPTACLE_WAYPOINTS:
             pose = PoseStamped()
             pose.header.frame_id = 'map'
             pose.header.stamp = self.navigator.get_clock().now().to_msg()
             pose.pose.position.x = x
             pose.pose.position.y = y
-            pose.pose.orientation.w = w
+            pose.pose.orientation.w = 1.0
             route_poses.append(pose)
 
         self.get_logger().info(
