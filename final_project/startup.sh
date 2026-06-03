@@ -52,7 +52,7 @@ tmux send-keys -t "$SESSION:map" "ros2 launch stretch_nav2 navigation.launch.py 
 
 # Terminal 3: aruco
 tmux new-window -t "$SESSION" -n 'aruco'
-tmux send-keys -t "$SESSION:aruco" "ros2 launch stretch_core stretch_aruco.launch.py aruco_marker_file:=${WEB_DIR}/../trash_markers.yaml" C-m
+tmux send-keys -t "$SESSION:aruco" "ros2 launch stretch_core stretch_aruco.launch.py" C-m
 
 # Terminal 8: action_server
 tmux new-window -t "$SESSION" -n 'action_server'

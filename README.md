@@ -29,3 +29,4 @@ ros2 service call /switch_to_navigation_mode std_srvs/srv/Trigger
 scp capstone@bresenham:/home/capstone/cse481/final_project/maps/mango_map_room_correct.pgm final_project/maps/mango_map_room_correct.pgm
 
 tmux kill-server
+~/stretch_install/factory/22.04$ ./stretch_create_ament_workspace.sh 
