@@ -34,11 +34,10 @@ RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
 # Each entry is [x, y, orientation_w]. orientation_w=1.0 means no rotation.
 # TODO: replace with real coordinates from your map.
 RECEPTACLE_WAYPOINTS = [
-    [2.55, 0.86], # by trash
-    [3.38, -0.75], # by table straight from trash
-    [4.19, -1.5], # by table right after
-    [5.21, -2.3438], #in doorway
-    [5.64, -4.91]  # looking at receptacle
+    [3.38, -0.75, 0.0, 1.0], # by table straight from trash
+    [4.19, -1.5, 0.0, 1.0], # by table right after
+    [5.21, -2.3438, 0.0, 1.0], #in doorway
+    [5.546, -4.71, 0.216,  0.976]  # looking at receptacle
 ]
 
 #final orientation: 0; 0; 0.231, 0.95
@@ -288,6 +287,7 @@ class WasteDisposal(Node):
 
     def execute_extraction(self):
         self.switch_mode("position")
+        self.send_base_goal_blocking([("joint_gripper_finger_left", -0.0757396)])
 
         # Approach
         self.get_logger().info("Executing navigation (approaching trash can)...")
@@ -300,13 +300,13 @@ class WasteDisposal(Node):
             if self.align_to_marker(target_frame, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION):
                 self.execute_named_pose_from_dict(pose)
         
-        self.send_base_goal_blocking([("translate_mobile_base", -0.02)])
+        self.send_base_goal_blocking([("translate_mobile_base", -0.06)])
 
         # Extraction
         self.get_logger().info("Executing extraction (picking up trash)...")
         pickup_poses = self.load_poses(CAN_PICKUP_POSE_FILE)
         # Sequence: before_pickup -> (grip) -> pickup_high -> pickup_retracted
-        for pose_name in ["before_pickup", "pickup_high", "pickup_retracted"]:
+        for pose_name in ["before_pickup", "during_pickup", "pickup_high", "pickup_retracted"]:
             if pose_name in pickup_poses:
                 self.get_logger().info(f"Executing pose: {pose_name}")
                 self.execute_named_pose_from_dict(pickup_poses[pose_name])
@@ -349,10 +349,10 @@ class WasteDisposal(Node):
         initial_pose = PoseStamped()
         initial_pose.header.frame_id = 'map'
         initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
-        initial_pose.pose.position.x = 2.55
-        initial_pose.pose.position.y = 0.86
-        initial_pose.pose.orientation.z = 0.9426348805427551
-        initial_pose.pose.orientation.w = -0.33381861448287964
+        initial_pose.pose.position.x = 1.9755
+        initial_pose.pose.position.y = 0.61291
+        initial_pose.pose.orientation.z = 0.97553
+        initial_pose.pose.orientation.w = -0.21984
 
         self.navigator.setInitialPose(initial_pose)
 
@@ -361,13 +361,15 @@ class WasteDisposal(Node):
 
         # Build the list of PoseStamped waypoints from the constants at the top
         route_poses = []
-        for x, y in RECEPTACLE_WAYPOINTS:
+        for x, y, z, w in RECEPTACLE_WAYPOINTS:
             pose = PoseStamped()
             pose.header.frame_id = 'map'
             pose.header.stamp = self.navigator.get_clock().now().to_msg()
             pose.pose.position.x = x
             pose.pose.position.y = y
-            pose.pose.orientation.w = 1.0
+            pose.pose.orientation.z = z
+            pose.pose.orientation.w = w
+
             route_poses.append(pose)
 
         self.get_logger().info(
