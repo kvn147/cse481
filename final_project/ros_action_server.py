@@ -37,7 +37,7 @@ RECEPTACLE_WAYPOINTS = [
     [3.38, -0.75, 0.0, 1.0], # by table straight from trash
     [4.19, -1.5, 0.0, 1.0], # by table right after
     [5.21, -2.3438, 0.0, 1.0], #in doorway
-    [5.546, -4.71, 0.216,  0.976]  # looking at receptacle
+    [5.246, -4.71, 0.423,  0.906]  # looking at receptacle
 ]
 
 #final orientation: 0; 0; 0.231, 0.95
