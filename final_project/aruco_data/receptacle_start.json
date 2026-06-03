@@ -18,7 +18,7 @@
       "joint_wrist_yaw": 3.5537221586017353
     },
     "lift_height": 1.0962894392744904,
-    "wrist_extension": 0.32049873355226427
+    "wrist_extension": 0.45049873355226427
   },
   "receptacle_drop": {
     "tf": null,

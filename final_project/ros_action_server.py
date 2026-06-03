@@ -335,7 +335,7 @@ class WasteDisposal(Node):
             offset_x = start_pose.get("position", {}).get("x", 0.0)
             if self.align_to_marker(target_frame, offset_x=offset_x, offset_z=offset_z, offset_orientation=RECEPTACLE_OFFSET_ORIENTATION):
                 self.execute_named_pose_from_dict(start_pose)
-                self.send_base_goal_blocking([("translate_mobile_base", 0.9)])  # move forward
+                self.send_base_goal_blocking([("translate_mobile_base", 1.1)])  # move forward
                 time.sleep(2.0)
 
         # disposal is in same JSON as approach
