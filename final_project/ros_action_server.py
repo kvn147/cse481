@@ -42,6 +42,7 @@ RECEPTACLE_WAYPOINTS = [
 
 #final orientation: 0; 0; 0.231, 0.95
 # starting orientation: 0.46794; 0.88376; 3.2462e-06; 1.7188e-06
+#goal orientation after extraction: z= 0.96962, -0.24463
 
 class WasteDisposal(Node):
     def __init__(self):
@@ -74,6 +75,10 @@ class WasteDisposal(Node):
             self.task_callback,
             10
         )
+
+        self.get_logger().info("Waiting for Nav2 to become active...")
+        self.navigator.waitUntilNav2Active()
+
         self.get_logger().info("Waste Disposal node started and listening to /task_execution.")
 
     def task_callback(self, msg):
@@ -120,6 +125,57 @@ class WasteDisposal(Node):
         else:
             self.get_logger().warn(f"Switch to {mode} mode failed: {result.message}")
         return result.success
+
+    def turn_to_goal_rot(self, z, w):
+        """Use Nav2 to rotate in place to the given quaternion orientation (z, w components)."""
+        self.switch_mode("navigation")
+
+        # Get current position from TF
+        try:
+            trans = self.tf_buffer.lookup_transform("map", "base_footprint", Time())
+            current_x = trans.transform.translation.x
+            current_y = trans.transform.translation.y
+            current_rot = trans.transform.rotation
+        except TransformException as e:
+            self.get_logger().error(f"turn_to_goal_rot: TF error: {e}")
+            return False
+
+        # Set initial pose from map -> base_footprint TF so AMCL is correctly localized
+        initial_pose = PoseStamped()
+        initial_pose.header.frame_id = 'map'
+        initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+        initial_pose.pose.position.x = current_x
+        initial_pose.pose.position.y = current_y
+        initial_pose.pose.orientation = current_rot
+        self.navigator.setInitialPose(initial_pose)
+        self.get_logger().info(f"Set initial pose to x={current_x:.3f}, y={current_y:.3f}")
+
+        # Goal is same x,y but with target orientation
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+        goal_pose.pose.position.x = current_x
+        goal_pose.pose.position.y = current_y
+        goal_pose.pose.orientation.z = z
+        goal_pose.pose.orientation.w = w
+
+        self.get_logger().info(f"Turning in place from pose x = {current_x} y = {current_y} z = {current_rot.z} w = {current_rot.w} to orientation z={z}, w={w}...")
+        self.navigator.goToPose(goal_pose)
+
+        while not self.navigator.isTaskComplete():
+            time.sleep(0.1)
+
+        result = self.navigator.getResult()
+        self.switch_mode("position")
+        if result == TaskResult.SUCCEEDED:
+            self.get_logger().info("Turn to goal orientation succeeded.")
+            return True
+        elif result == TaskResult.CANCELED:
+            self.get_logger().warn("Turn to goal orientation was cancelled.")
+            return False
+        else:
+            self.get_logger().error(f"Turn to goal orientation failed: {result}")
+            return False
 
     def send_base_goal_blocking(self, joints_list, duration=5.0):
         # Wait if paused
@@ -224,7 +280,7 @@ class WasteDisposal(Node):
             self.get_logger().error(f"Transform error: {e}")
             return None, None, None
 
-    def align_to_marker(self, target_frame, offset_x=0, offset_y=0, offset_z=0, offset_orientation=0):
+    def align_to_marker(self, target_frame, offset_x=0, offset_y=0, offset_z=0, offset_orientation=0, use_trajectory=True, offset_orientation_z=0, offset_orientation_w=0):
         self.get_logger().info(f"Aligning to {target_frame} with offset z={offset_z}")
         phi, dist, final_theta = self.compute_difference(target_frame, offset_x, offset_y, offset_z, offset_orientation)
         
@@ -234,7 +290,10 @@ class WasteDisposal(Node):
         # Split base goals because they are mutually exclusive in the hardware controller
         self.send_base_goal_blocking([("rotate_mobile_base", phi)])
         self.send_base_goal_blocking([("translate_mobile_base", dist)], 30.0)
-        self.send_base_goal_blocking([("rotate_mobile_base", final_theta)])
+        if use_trajectory:
+            self.send_base_goal_blocking([("rotate_mobile_base", final_theta)])
+        else:
+            self.turn_to_goal_rot(offset_orientation_z, offset_orientation_w)
         return True
 
     def execute_named_pose_from_dict(self, pose_data):
@@ -297,10 +356,10 @@ class WasteDisposal(Node):
             pose = start_poses["trash_start"]
             target_frame = pose.get("frame", "trash_can")
             offset_z = pose.get("position", {}).get("z")
-            if self.align_to_marker(target_frame, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION):
+            if self.align_to_marker(target_frame, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
                 self.execute_named_pose_from_dict(pose)
         
-        self.send_base_goal_blocking([("translate_mobile_base", -0.06)])
+        self.send_base_goal_blocking([("translate_mobile_base", -0.07)])
 
         # Extraction
         self.get_logger().info("Executing extraction (picking up trash)...")
@@ -327,7 +386,9 @@ class WasteDisposal(Node):
             offset_x = start_pose.get("position", {}).get("x", 0.0)
             if self.align_to_marker(target_frame, offset_x=offset_x, offset_z=offset_z, offset_orientation=RECEPTACLE_OFFSET_ORIENTATION):
                 self.execute_named_pose_from_dict(start_pose)
-                self.send_base_goal_blocking([("translate_mobile_base", 1.1)])  # move forward
+                self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
+                self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
+                self.send_base_goal_blocking([("translate_mobile_base", 0.25)])  # move forward
                 time.sleep(2.0)
 
         # disposal is in same JSON as approach
@@ -355,9 +416,6 @@ class WasteDisposal(Node):
         initial_pose.pose.orientation.w = -0.21984
 
         self.navigator.setInitialPose(initial_pose)
-
-        self.get_logger().info("Waiting for Nav2 to become active...")
-        self.navigator.waitUntilNav2Active()
 
         # Build the list of PoseStamped waypoints from the constants at the top
         route_poses = []
