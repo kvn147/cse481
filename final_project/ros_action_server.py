@@ -385,7 +385,7 @@ class WasteDisposal(Node):
             pose = start_poses["trash_start"]
             target_frame = pose.get("frame", "trash_can")
             offset_z = pose.get("position", {}).get("z")
-            if self.align_to_marker(target_frame, offset_x=0.15, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
+            if self.align_to_marker(target_frame, offset_x=0.17, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
                 # self.turn_to_goal_rot(0.0, 0.0)
                 # self.send_base_goal_blocking([("rotate_mobile_base", np.pi/2)])
                 self.execute_named_pose_from_dict(pose)
