@@ -23,6 +23,9 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 from action_msgs.msg import GoalStatus
 from stretch_nav2.robot_navigator import BasicNavigator, TaskResult
 
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
 CAN_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco_data/trash_start.json" # this is how stretch approaches the can
 CAN_PICKUP_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/joint_state_data/trash_pickup.json" # this is the extraction poses
 RECEPTACLE_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco_data/receptacle_start.json" # this is the approach pose for the receptacle
@@ -159,14 +162,31 @@ class WasteDisposal(Node):
         self.navigator.setInitialPose(initial_pose)
         self.get_logger().info(f"Set initial pose to x={current_x:.3f}, y={current_y:.3f}")
 
+        # 1. Define your current pose orientation (Example: no rotation, [x, y, z, w])
+        current_quat_array = np.array([0.0, 0.0, current_rot.z, current_rot.w])
+
+        # 2. Create a quaternion for a 90 degree Yaw rotation (around the Z-axis)
+        # Note: In most robotics conventions, Z is the yaw axis
+        yaw_quat = R.from_euler('z', 90, degrees=True)
+
+        # 3. Multiply them to combine the rotations
+        # Note: SciPy allows direct multiplication of Rotation objects
+        current_rotation = R.from_quat(current_quat_array)
+        new_rotation = yaw_quat * current_rotation
+
+        # Get the final quaternion [x, y, z, w]
+        new_quat_array = new_rotation.as_quat()
+
         # Goal is same x,y but with target orientation
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.navigator.get_clock().now().to_msg()
         goal_pose.pose.position.x = current_x
         goal_pose.pose.position.y = current_y
-        goal_pose.pose.orientation.z = z
-        goal_pose.pose.orientation.w = w
+        goal_pose.pose.orientation.z = new_quat_array[2]
+        goal_pose.pose.orientation.w = new_quat_array[3]
+        # goal_pose.pose.orientation.z = z
+        # goal_pose.pose.orientation.w = w
 
         self.get_logger().info(f"Turning in place from pose x = {current_x} y = {current_y} z = {current_rot.z} w = {current_rot.w} to orientation z={z}, w={w}...")
         self.navigator.goToPose(goal_pose)
