@@ -95,7 +95,22 @@ class WasteDisposal(Node):
         self.get_logger().info("Waiting for Nav2 to become active...")
         self.navigator.waitUntilNav2Active()
 
-        self.get_logger().info("Waste Disposal node started and listening to /task_execution.")
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_states_callback,
+            10
+        )
+        self.get_logger().info("Waste Disposal node started and listening to /task_execution and /joint_states.")
+
+    def joint_states_callback(self, msg):
+        try:
+            pan_idx = msg.name.index('joint_head_pan')
+            tilt_idx = msg.name.index('joint_head_tilt')
+            self.current_pan = msg.position[pan_idx]
+            self.current_tilt = msg.position[tilt_idx]
+        except (ValueError, IndexError):
+            pass
 
     def task_callback(self, msg):
         task_type = msg.data.strip().lower()
@@ -216,6 +231,8 @@ class WasteDisposal(Node):
         if self._abort_requested:
             self.get_logger().warn("Task aborted! Skipping trajectory execution.")
             return False
+
+    def send_base_goal_blocking(self, joints_list, duration=5.0):
 
         point = JointTrajectoryPoint()
         point.positions = [float(inc) for _, inc in joints_list]
@@ -511,22 +528,22 @@ class WasteDisposal(Node):
     def execute_camera_up(self):
         new_tilt = self.current_tilt + 0.2
         self.get_logger().info(f"Moving camera UP to {new_tilt}")
-        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration_sec=0.5)
+        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration=0.5)
 
     def execute_camera_down(self):
         new_tilt = self.current_tilt - 0.2
         self.get_logger().info(f"Moving camera DOWN to {new_tilt}")
-        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration_sec=0.5)
+        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration=0.5)
 
     def execute_camera_left(self):
         new_pan = self.current_pan + 0.2
         self.get_logger().info(f"Moving camera LEFT to {new_pan}")
-        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration_sec=0.5)
+        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration=0.5)
 
     def execute_camera_right(self):
         new_pan = self.current_pan - 0.2
         self.get_logger().info(f"Moving camera RIGHT to {new_pan}")
-        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration_sec=0.5)
+        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration=0.5)
 
 def main(args=None):
     rclpy.init(args=args)
