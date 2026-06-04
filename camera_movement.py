@@ -3,6 +3,7 @@ import time
 from stretch_body.hello_utils import deg_to_rad
 
 robot = stretch_body.robot.Robot()
+robot.startup() 
 
 
 # Head
@@ -23,8 +24,8 @@ robot.push_command()
 time.sleep(2.0)
 
 # Translate base
-# robot.base.translate_by(-0.05)
-# robot.push_command()
-# time.sleep(3.0)
+robot.base.rotate_by(deg_to_rad(90))
+robot.push_command()
+time.sleep(3.0)
 
 robot.stop()

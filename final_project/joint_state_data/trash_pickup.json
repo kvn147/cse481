@@ -49,7 +49,35 @@
       "joint_arm_l2": 0.06851279826682022,
       "joint_arm_l3": 0.06851279826682022,
       "joint_wrist_yaw": 0.042184471666855135,
-      "joint_wrist_pitch": 0.839883500485026674,
+      "joint_wrist_pitch": -0.039883500485026674,
+      "joint_wrist_roll": -0.0015339807878856412,
+      "joint_gripper_finger_left": 0.0,
+      "joint_arm_total": 0.3340511930672809
+    }
+  },
+  "pickup_scoop": {
+    "tf": {
+      "frame": "base_link",
+      "position": {
+        "x": -0.024825451723952605,
+        "y": -0.6779419327201495,
+        "z": 0.5262856896080244
+      },
+      "orientation": {
+        "x": 0.02795578702518942,
+        "y": -0.0030993506078513798,
+        "z": -0.6952106549365248,
+        "w": 0.7182555347926948
+      }
+    },
+    "joints": {
+      "joint_lift": 0.3882378365420798,
+      "joint_arm_l0": 0.06851279826682022,
+      "joint_arm_l1": 0.06851279826682022,
+      "joint_arm_l2": 0.06851279826682022,
+      "joint_arm_l3": 0.06851279826682022,
+      "joint_wrist_yaw": 0.042184471666855135,
+      "joint_wrist_pitch": 1.539883500485026674,
       "joint_wrist_roll": -0.0015339807878856412,
       "joint_gripper_finger_left": 0.0,
       "joint_arm_total": 0.3340511930672809
@@ -104,8 +132,8 @@
       "joint_arm_l1": 0.0,
       "joint_arm_l2": 0.0,
       "joint_arm_l3": 0.0,
-      "joint_wrist_yaw": 3.5537221586017353,
-      "joint_wrist_pitch": 1.539883500485026674,
+      "joint_wrist_yaw": 3.0537221586017353,
+      "joint_wrist_pitch": 0.089883500485026674,
       "joint_wrist_roll": -0.0015339807878856412,
       "joint_gripper_finger_left": 0.0,
       "joint_arm_total": 0.0
