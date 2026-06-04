@@ -1,8 +1,10 @@
 import json
+import math
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState
+from numpy import array, matmul
 
 import tf2_ros
 from tf2_ros import TransformException, Buffer, TransformListener
@@ -23,7 +25,6 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 from action_msgs.msg import GoalStatus
 from stretch_nav2.robot_navigator import BasicNavigator, TaskResult
 
-import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 CAN_START_POSE_FILE = "/home/hello-robot/kevin/cse481/final_project/aruco_data/trash_start.json" # this is how stretch approaches the can
@@ -34,8 +35,6 @@ TRASH_CAN_OFFSET_ORIENTATION = np.pi
 RECEPTACLE_OFFSET_ORIENTATION = np.pi/2
 
 # Hardcoded map-frame waypoints for navigating to the receptacle.
-# Each entry is [x, y, orientation_w]. orientation_w=1.0 means no rotation.
-# TODO: replace with real coordinates from your map.
 RECEPTACLE_WAYPOINTS = [
     [3.38, -0.75, 0.0, 1.0], # by table straight from trash
     [4.19, -1.5, 0.0, 1.0], # by table right after
@@ -43,9 +42,15 @@ RECEPTACLE_WAYPOINTS = [
     [5.246, -4.31, 0.259,  0.966]  # looking at receptacle
 ]
 
-#final orientation: 0; 0; 0.231, 0.95
-# starting orientation: 0.46794; 0.88376; 3.2462e-06; 1.7188e-06
-#goal orientation after extraction: z= 0.96962, -0.24463
+# --- NEW ADDITIONS FOR REFINEMENT AND CAMERA PAN ---
+HEAD_PAN_SEARCH = -1 * np.pi / 2
+HEAD_PAN_NEUTRAL = 0.0
+MINIMUM_ANGLE_THRESHOLD = 0.03 
+MAX_TF_AGE = 1.0                # seconds
+RECENT_TF_TIMEOUT = 5.0         # seconds
+RECENT_TF_POLL_TIME = 0.1       # seconds
+TRASH_CAN_MARKER_OFFSET_X = 0.17
+# ---------------------------------------------------
 
 class WasteDisposal(Node):
     def __init__(self):
@@ -300,6 +305,68 @@ class WasteDisposal(Node):
             self.get_logger().error(f"Transform error: {e}")
             return None, None, None
 
+    # --- NEW ADDITIONS FOR REFINEMENT ---
+    def _get_recent_tf(self, source: str, target: str):
+        """Helper to fetch TF only if it's fresh."""
+        try:
+            tf = self.tf_buffer.lookup_transform(source, target, Time())
+            current_time = self.get_clock().now()
+            tf_age = (current_time - Time.from_msg(tf.header.stamp)).nanoseconds / 1e9
+            if tf_age <= MAX_TF_AGE:
+                return tf
+        except TransformException:
+            pass
+        return None
+
+    def block_until_recent_tf(self, source: str, target: str):
+        """Blocks and logs until a fresh TF is available to prevent extrapolation errors."""
+        start = time.monotonic()
+        tf = self._get_recent_tf(source, target)
+        while tf is None:
+            if time.monotonic() - start >= RECENT_TF_TIMEOUT:
+                raise ValueError(f"TF {source}->{target} not available within {RECENT_TF_TIMEOUT}s.")
+            time.sleep(RECENT_TF_POLL_TIME)
+            tf = self._get_recent_tf(source, target)
+        return tf
+
+    def compute_angle_to_marker(self) -> float:
+        tf = self.block_until_recent_tf("base_link", "trash_can")
+
+        # Compute angle based on location.
+        target_point_x, target_point_y = self._target_xy_from_tf(tf, TRASH_CAN_MARKER_OFFSET_X)
+        angle = atan2(target_point_y, target_point_x)
+
+        # Adjust for head pan offset.
+        angle -= - np.pi/2 -np.pi/32
+
+
+
+        self.get_logger().info(f"Angle to offset marker: {angle}")
+        return angle
+
+
+    def _target_xy_from_tf(self,
+        tf: TransformStamped, x_offset: float
+    ) -> tuple[float, float]:
+        """Compute the target point in the robot frame after applying the marker offset."""
+        rotation_matrix = quaternion_matrix(
+            (
+                tf.transform.rotation.x,
+                tf.transform.rotation.y,
+                tf.transform.rotation.z,
+                tf.transform.rotation.w,
+            )
+        )
+        offset_vector = array([[x_offset], [0], [tf.transform.translation.x], [1]])
+        marker_vector = array(
+            [[tf.transform.translation.x], [tf.transform.translation.y], [0], [1]]
+        )
+        offset_direction = matmul(rotation_matrix, offset_vector)
+        final_location = offset_direction + marker_vector
+        return float(final_location[0, 0]), float(final_location[1, 0])
+    # ------------------------------------
+
+
     def align_to_marker(self, target_frame, offset_x=0, offset_y=0, offset_z=0, offset_orientation=0, use_trajectory=True, offset_orientation_z=0, offset_orientation_w=0):
         self.get_logger().info(f"Aligning to {target_frame} with offset z={offset_z}")
         phi, dist, final_theta = self.compute_difference(target_frame, offset_x, offset_y, offset_z, offset_orientation)
@@ -315,6 +382,37 @@ class WasteDisposal(Node):
         else:
             self.turn_to_goal_rot(offset_orientation_z, offset_orientation_w)
         return True
+
+    def refine_and_hook_alignment(self, target_frame, offset_x, offset_y, offset_z, offset_orientation):
+        """
+        Executes precision local visual servoing and the final hook turn 
+        AFTER the initial base alignment and translation are complete.
+        """
+        self.get_logger().info("Initial approach done. Starting head pan and iterative refinement...")
+
+        # 1. PAN HEAD (Look Left to find the marker from the side)
+        self.send_base_goal_blocking([("joint_head_pan", HEAD_PAN_SEARCH)])
+
+        # 2. ITERATIVE REFINEMENT LOOP
+        self.get_logger().info("Running visual servoing loop...")
+        
+        try:
+            angle_to_marker = self.compute_angle_to_marker()
+            while abs(angle_to_marker) > MINIMUM_ANGLE_THRESHOLD:
+                # Rotate.
+                self.get_logger().info(f"Correcting by {angle_to_marker}...")
+                self.send_base_goal_blocking([("rotate_mobile_base",angle_to_marker)])
+
+                # Compute current angle.
+                angle_to_marker = self.compute_angle_to_marker()
+        except:
+            self.get_logger().info(f"Aborting visual servoing because can't see marker")
+
+        self.get_logger().info("Iterative refinement complete.")
+
+        # 3. PAN HEAD BACK TO NEUTRAL
+        self.send_base_goal_blocking([("joint_head_pan", HEAD_PAN_NEUTRAL)])
+        time.sleep(0.5)
 
     def execute_named_pose_from_dict(self, pose_data):
         if "joints" in pose_data:
@@ -366,7 +464,8 @@ class WasteDisposal(Node):
 
     def execute_extraction(self):
         self.switch_mode("position")
-        self.send_base_goal_blocking([("joint_gripper_finger_left", -0.0757396)])
+        self.send_base_goal_blocking([("joint_gripper_finger_left", -0.0757396), ("joint_head_tilt", -0.75)])
+        time.sleep(0.5)
 
         # Approach
         self.get_logger().info("Executing navigation (approaching trash can)...")
@@ -376,7 +475,14 @@ class WasteDisposal(Node):
             pose = start_poses["trash_start"]
             target_frame = pose.get("frame", "trash_can")
             offset_z = pose.get("position", {}).get("z")
-            if self.align_to_marker(target_frame, offset_x=0.17, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
+            if self.align_to_marker(target_frame, offset_x=TRASH_CAN_MARKER_OFFSET_X, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
+                self.refine_and_hook_alignment(
+                    target_frame=target_frame,
+                    offset_x=TRASH_CAN_MARKER_OFFSET_X,
+                    offset_y=0.0,
+                    offset_z=0.1,
+                    offset_orientation=TRASH_CAN_OFFSET_ORIENTATION
+                )
                 # self.turn_to_goal_rot(0.0, 0.0)
                 # self.send_base_goal_blocking([("rotate_mobile_base", np.pi/2)])
                 self.execute_named_pose_from_dict(pose)
@@ -408,6 +514,7 @@ class WasteDisposal(Node):
                 self.execute_named_pose_from_dict(start_pose)
                 self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
                 self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
+                self.send_base_goal_blocking([("translate_mobile_base", 0.2)])  # move forward
                 time.sleep(2.0)
 
         # disposal is in same JSON as approach
@@ -480,6 +587,7 @@ class WasteDisposal(Node):
 
     def execute_sequence(self):
         self.get_logger().info("Starting automatic sequence: Extraction -> Disposal")
+        self.execute_reset()
         self.execute_extraction()
         self.execute_go_to_receptacle()
         self.execute_disposal()
@@ -488,7 +596,7 @@ class WasteDisposal(Node):
     def execute_reset(self):
         self.get_logger().info("Executing reset (returning to neutral pose)...")
         joints_list = [
-            ("joint_lift",        0.5),
+            ("joint_lift",        0.8),
             ("joint_arm_l0",      0.0),
             ("joint_arm_l1",      0.0),
             ("joint_arm_l2",      0.0),

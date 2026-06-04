@@ -25,6 +25,7 @@ tmux new-session -d -s "$SESSION" -n 'driver'
 
 # no renaming windows
 tmux set-option -t "$SESSION:driver" allow-rename off
+# tmux send-keys -t "$SESSION:camera" "ros2 launch stretch_core d435i_high_resolution.launch.py" C-m
 
 # Terminal 2: camera
 tmux new-window -t "$SESSION" -n 'camera'
