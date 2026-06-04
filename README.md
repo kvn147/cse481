@@ -24,6 +24,7 @@ cd /home/hello-robot/kevin/cse481/final_project && python3 ros_action_server.py
 ros2 topic pub --once /task_execution std_msgs/msg/String "data: 'go_to_receptacle'"
 
 ros2 launch stretch_core stretch_driver.launch.py mode:=navigation broadcast_odom_tf:=True
+
 ros2 service call /switch_to_position_mode std_srvs/srv/Trigger
 ros2 service call /switch_to_navigation_mode std_srvs/srv/Trigger
 scp capstone@bresenham:/home/capstone/cse481/final_project/maps/mango_map_room_correct.pgm final_project/maps/mango_map_room_correct.pgm
