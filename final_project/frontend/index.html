@@ -11,12 +11,10 @@
 
     <div class="controls">
       <button class="primary" onclick="executeTask('sequence')">Start Automatic Disposal</button>
-      <button id="pauseBtn" class="warning" onclick="togglePause()">Pause Task</button>
-      <button id="stopBtn" class="danger" onclick="estop()">Emergency Stop</button>
       <button onclick="executeTask('extraction')">Execute Extraction</button>
       <button onclick="executeTask('disposal')">Execute Disposal</button>
       <button class="secondary" onclick="executeTask('reset')">Reset Robot (Neutral Position)</button>
-      <button class="secondary" onclick="executeTask('locate_can')">Locate Garbage Can</button> 
+      <button class="secondary" onclick="executeTask('locate_can')">[FUTURE] Locate Garbage Can</button> 
       <button class="secondary" onclick="executeTask('collect')">[FUTURE] Trash Collection</button>
     </div>
 
@@ -29,6 +27,14 @@
 
     <div class="camera-feed" id="video">
         <img src="https://video.kevinn.me/stream?topic=/camera/color/image_raw&type=mjpeg" style="transform: rotate(90deg);">
+        <div class="camera-controls-container">
+          <div class="dpad">
+            <button class="dpad-button up" onclick="executeTask('camera_up')">▲</button>
+            <button class="dpad-button left" onclick="executeTask('camera_left')">◀</button>
+            <button class="dpad-button down" onclick="executeTask('camera_down')">▼</button>
+            <button class="dpad-button right" onclick="executeTask('camera_right')">▶</button>
+          </div>
+        </div>
     </div>
     </div>
 
@@ -44,10 +50,6 @@
     });
 
     const statusText = document.getElementById("status");
-    const stopBtn = document.getElementById("stopBtn");
-    const pauseBtn = document.getElementById("pauseBtn");
-
-    let isPaused = false;
 
     ros.on('connection', () => {
       statusText.innerText = "Connected to Stretch";
@@ -65,68 +67,12 @@
     });
 
     function executeTask(taskType) {
-      // Reset button appearances
-      if (stopBtn) {
-        stopBtn.innerText = "Emergency Stop";
-        stopBtn.style.backgroundColor = "#e74c3c";
-      }
-      if (pauseBtn) {
-        pauseBtn.innerText = "Pause Task";
-        pauseBtn.style.backgroundColor = "#f1c40f"; // Standard warning yellow
-      }
-      isPaused = false;
-
       const msg = new ROSLIB.Message({
         data: taskType
       });
       taskTopic.publish(msg);
       statusText.innerText = "Status: Executing " + taskType + "...";
       console.log("Published task:", taskType);
-    }
-
-    function togglePause() {
-      isPaused = !isPaused;
-      const task = isPaused ? 'pause' : 'resume';
-      
-      if (pauseBtn) {
-        pauseBtn.innerText = isPaused ? "Resume Task" : "Pause Task";
-        pauseBtn.style.backgroundColor = isPaused ? "#27ae60" : "#f1c40f";
-      }
-
-      const msg = new ROSLIB.Message({
-        data: task
-      });
-      taskTopic.publish(msg);
-      statusText.innerText = "Status: " + (isPaused ? "PAUSED" : "RESUMING...");
-    }
-
-    function estop() {
-      // Change button appearance to "ABORTED"
-      if (stopBtn) {
-        stopBtn.innerText = "ABORTED";
-        stopBtn.style.backgroundColor = "#c0392b"; // Harder red
-      }
-
-      // Send stop command to task execution
-      const msg = new ROSLIB.Message({
-        data: 'stop'
-      });
-      taskTopic.publish(msg);
-
-      // Also send zero velocity to cmd_vel as an immediate safety measure
-      const cmdVel = new ROSLIB.Topic({
-        ros: ros,
-        name: "/stretch/cmd_vel",
-        messageType: "geometry_msgs/Twist"
-      });
-      const stopMsg = new ROSLIB.Message({
-        linear: { x: 0, y: 0, z: 0 },
-        angular: { x: 0, y: 0, z: 0 }
-      });
-      cmdVel.publish(stopMsg);
-
-      statusText.innerText = "Status: EMERGENCY STOP SENT (ABORTED)";
-      statusText.style.color = "#e74c3c";
     }
     </script>
 

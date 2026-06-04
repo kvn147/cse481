@@ -43,20 +43,35 @@ class WasteDisposal(Node):
         )
 
         self._goal_handle = None
-        self._abort_requested = False
-        self._is_paused = False
+        self.current_pan = 0.0
+        self.current_tilt = 0.0
 
         if not self.trajectory_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error("Unable to connect to trajectory server.")
             
-        # Subscriber
+        # Subscribers
         self.subscription = self.create_subscription(
             String,
             'task_execution',
             self.task_callback,
             10
         )
-        self.get_logger().info("Waste Disposal node started and listening to /task_execution.")
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_states_callback,
+            10
+        )
+        self.get_logger().info("Waste Disposal node started and listening to /task_execution and /joint_states.")
+
+    def joint_states_callback(self, msg):
+        try:
+            pan_idx = msg.name.index('joint_head_pan')
+            tilt_idx = msg.name.index('joint_head_tilt')
+            self.current_pan = msg.position[pan_idx]
+            self.current_tilt = msg.position[tilt_idx]
+        except (ValueError, IndexError):
+            pass
 
     def task_callback(self, msg):
         task_type = msg.data.strip().lower()
@@ -67,10 +82,6 @@ class WasteDisposal(Node):
         if not handler:
             self.get_logger().error(f"Unknown task type: {task_type}")
             return
-        
-        if task_type not in ["stop", "pause", "resume"]:
-            self._abort_requested = False
-            self._is_paused = False
         
         # Run execution in a separate background thread so rclpy.spin() doesn't deadlock
         threading.Thread(target=handler, daemon=True).start()
@@ -83,20 +94,11 @@ class WasteDisposal(Node):
             self.get_logger().error(f"Could not load poses from {file_path}: {e}")
             return {}
 
-    def send_base_goal_blocking(self, joints_list):
-        # Wait if paused
-        while self._is_paused:
-            time.sleep(0.1)
-            if self._abort_requested:
-                return False
-
-        if self._abort_requested:
-            self.get_logger().warn("Task aborted! Skipping trajectory execution.")
-            return False
+    def send_base_goal_blocking(self, joints_list, duration_sec=5.0):
 
         point = JointTrajectoryPoint()
         point.positions = [float(inc) for _, inc in joints_list]
-        point.time_from_start = Duration(seconds=5.0).to_msg()
+        point.time_from_start = Duration(seconds=duration_sec).to_msg()
 
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = [joint_name for joint_name, _ in joints_list]
@@ -313,24 +315,26 @@ class WasteDisposal(Node):
         ]
         self.send_base_goal_blocking(joints_list)
 
-    def execute_stop(self):
-        self.get_logger().warn("Stop requested! Halting immediately.")
-        self._abort_requested = True
-        if self._goal_handle:
-            self.get_logger().info("Attempting to cancel current trajectory...")
-            self._goal_handle.cancel_goal_async()
-            self._goal_handle = None
-        else:
-            self.get_logger().info("No active trajectory to cancel.")
+    def execute_camera_up(self):
+        new_tilt = self.current_tilt + 0.2
+        self.get_logger().info(f"Moving camera UP to {new_tilt}")
+        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration_sec=0.5)
 
-    def execute_pause(self):
-        self.get_logger().info("Pause requested.")
-        self._is_paused = True
+    def execute_camera_down(self):
+        new_tilt = self.current_tilt - 0.2
+        self.get_logger().info(f"Moving camera DOWN to {new_tilt}")
+        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration_sec=0.5)
 
-    def execute_resume(self):
-        self.get_logger().info("Resume requested.")
-        self._is_paused = False
-           
+    def execute_camera_left(self):
+        new_pan = self.current_pan + 0.2
+        self.get_logger().info(f"Moving camera LEFT to {new_pan}")
+        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration_sec=0.5)
+
+    def execute_camera_right(self):
+        new_pan = self.current_pan - 0.2
+        self.get_logger().info(f"Moving camera RIGHT to {new_pan}")
+        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration_sec=0.5)
+
 def main(args=None):
     rclpy.init(args=args)
     waste_disposal = WasteDisposal()
