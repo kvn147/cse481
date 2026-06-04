@@ -40,7 +40,7 @@ RECEPTACLE_WAYPOINTS = [
     [3.38, -0.75, 0.0, 1.0], # by table straight from trash
     [4.19, -1.5, 0.0, 1.0], # by table right after
     [5.21, -2.3438, 0.0, 1.0], #in doorway
-    [5.246, -4.71, 0.423,  0.906]  # looking at receptacle
+    [5.246, -4.31, 0.259,  0.966]  # looking at receptacle
 ]
 
 #final orientation: 0; 0; 0.231, 0.95
@@ -158,7 +158,7 @@ class WasteDisposal(Node):
 
         # 2. Create a quaternion for a 90 degree Yaw rotation (around the Z-axis)
         # Note: In most robotics conventions, Z is the yaw axis
-        yaw_quat = R.from_euler('z', 90, degrees=True)
+        yaw_quat = R.from_euler('z', 108, degrees=True)
 
         # 3. Multiply them to combine the rotations
         # Note: SciPy allows direct multiplication of Rotation objects
@@ -376,16 +376,16 @@ class WasteDisposal(Node):
             pose = start_poses["trash_start"]
             target_frame = pose.get("frame", "trash_can")
             offset_z = pose.get("position", {}).get("z")
-            if self.align_to_marker(target_frame, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
+            if self.align_to_marker(target_frame, offset_x=0.15, offset_z=offset_z, offset_orientation=TRASH_CAN_OFFSET_ORIENTATION, use_trajectory=False, offset_orientation_z=-0.906, offset_orientation_w= 0.423):
+                # self.turn_to_goal_rot(0.0, 0.0)
+                # self.send_base_goal_blocking([("rotate_mobile_base", np.pi/2)])
                 self.execute_named_pose_from_dict(pose)
-        
-        self.send_base_goal_blocking([("translate_mobile_base", -0.07)])
 
         # Extraction
         self.get_logger().info("Executing extraction (picking up trash)...")
         pickup_poses = self.load_poses(CAN_PICKUP_POSE_FILE)
         # Sequence: before_pickup -> (grip) -> pickup_high -> pickup_retracted
-        for pose_name in ["before_pickup", "during_pickup", "pickup_high", "pickup_retracted"]:
+        for pose_name in ["before_pickup", "during_pickup", "pickup_scoop", "pickup_high", "pickup_retracted"]:
             if pose_name in pickup_poses:
                 self.get_logger().info(f"Executing pose: {pose_name}")
                 self.execute_named_pose_from_dict(pickup_poses[pose_name])
@@ -404,11 +404,10 @@ class WasteDisposal(Node):
 
             offset_z = start_pose.get("position", {}).get("z", 0.0)
             offset_x = start_pose.get("position", {}).get("x", 0.0)
-            if self.align_to_marker(target_frame, offset_x=offset_x, offset_z=offset_z, offset_orientation=RECEPTACLE_OFFSET_ORIENTATION):
+            if self.align_to_marker(target_frame, offset_x=offset_x, offset_z=offset_z, offset_orientation=RECEPTACLE_OFFSET_ORIENTATION, use_trajectory=True, offset_orientation_z =  0.431, offset_orientation_w = 0.903):
                 self.execute_named_pose_from_dict(start_pose)
                 self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
-                self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
-                self.send_base_goal_blocking([("translate_mobile_base", 0.25)])  # move forward
+                self.send_base_goal_blocking([("translate_mobile_base", 0.5)])  # move forward
                 time.sleep(2.0)
 
         # disposal is in same JSON as approach

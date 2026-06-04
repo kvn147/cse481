@@ -15,7 +15,7 @@
     "gripper_rpy": {
       "joint_wrist_roll": 0.0,
       "joint_wrist_pitch": -0.23316507975861747,
-      "joint_wrist_yaw": 3.5537221586017353
+      "joint_wrist_yaw": 3.0537221586017353
     },
     "lift_height": 1.0962894392744904,
     "wrist_extension": 0.47049873355226427
