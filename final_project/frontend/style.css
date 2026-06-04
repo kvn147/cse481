@@ -46,6 +46,7 @@ button:active {
 }
 button.secondary { 
     background-color: #95a5a6; 
+    grid-column: span 2; 
 }
 button.secondary:hover { 
     background-color: #7f8c8d; 

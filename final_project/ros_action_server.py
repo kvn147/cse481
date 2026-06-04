@@ -222,17 +222,6 @@ class WasteDisposal(Node):
             return False
 
     def send_base_goal_blocking(self, joints_list, duration=5.0):
-        # Wait if paused
-        while self._is_paused:
-            time.sleep(0.1)
-            if self._abort_requested:
-                return False
-
-        if self._abort_requested:
-            self.get_logger().warn("Task aborted! Skipping trajectory execution.")
-            return False
-
-    def send_base_goal_blocking(self, joints_list, duration=5.0):
 
         point = JointTrajectoryPoint()
         point.positions = [float(inc) for _, inc in joints_list]
