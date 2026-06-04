@@ -337,7 +337,7 @@ class WasteDisposal(Node):
         angle = atan2(target_point_y, target_point_x)
 
         # Adjust for head pan offset.
-        angle -= - np.pi/2 -np.pi/32
+        angle -= - np.pi/2
 
 
 
