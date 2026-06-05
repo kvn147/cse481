@@ -76,6 +76,10 @@ class WasteDisposal(Node):
         # Nav2 navigator
         self.navigator = BasicNavigator()
 
+        # for sequence state tracking
+        self._current_sequence_step = "READY"
+        self._last_saved_waypoint = 0
+
         # Joint states tracking
         self.current_tilt = 0.0
         self.current_pan = 0.0
@@ -575,7 +579,7 @@ class WasteDisposal(Node):
             drop_pose = poses["receptacle_drop"]
             self.execute_named_pose_from_dict(drop_pose)
 
-    def execute_go_to_receptacle(self):
+    def execute_go_to_receptacle(self, start_index=0):
         """
         Use Nav2 to navigate through RECEPTACLE_WAYPOINTS in sequence.
         Blocks until all waypoints are visited, navigation fails, or is cancelled.
@@ -583,20 +587,21 @@ class WasteDisposal(Node):
         """
         self.switch_mode("navigation")
 
-        # Set our demo's initial pose
-        initial_pose = PoseStamped()
-        initial_pose.header.frame_id = 'map'
-        initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
-        initial_pose.pose.position.x = 1.9755
-        initial_pose.pose.position.y = 0.61291
-        initial_pose.pose.orientation.z = 0.97553
-        initial_pose.pose.orientation.w = -0.21984
+        if start_index == 0:
+            # Set our demo's initial pose
+            initial_pose = PoseStamped()
+            initial_pose.header.frame_id = 'map'
+            initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+            initial_pose.pose.position.x = 1.9755
+            initial_pose.pose.position.y = 0.61291
+            initial_pose.pose.orientation.z = 0.97553
+            initial_pose.pose.orientation.w = -0.21984
 
-        self.navigator.setInitialPose(initial_pose)
+            self.navigator.setInitialPose(initial_pose)
 
         # Build the list of PoseStamped waypoints from the constants at the top
         route_poses = []
-        for x, y, z, w in RECEPTACLE_WAYPOINTS:
+        for x, y, z, w in RECEPTACLE_WAYPOINTS[start_index:]:
             pose = PoseStamped()
             pose.header.frame_id = 'map'
             pose.header.stamp = self.navigator.get_clock().now().to_msg()
@@ -608,13 +613,26 @@ class WasteDisposal(Node):
             route_poses.append(pose)
 
         self.get_logger().info(
-            f"Following {len(route_poses)} waypoints to receptacle..."
+            f"Following {len(route_poses)} waypoints to receptacle...and starting from index {start_index}..."
         )
         self.navigator.followWaypoints(route_poses)
 
         # Block until Nav2 finishes, logging current waypoint along the way
         i = 0
+        last_completed_index_in_slice = 0
+        
         while not self.navigator.isTaskComplete():
+            if self._is_paused:
+                self.get_logger().warn("Navigation paused. Canceling active Nav2 task and saving progress.")
+                feedback = self.navigator.getFeedback()
+                if feedback:
+                    self._last_saved_waypoint = start_index + feedback.current_waypoint
+                else:
+                    self._last_saved_waypoint = start_index + last_completed_index_in_slice    
+                
+                self.navigator.cancelTask()
+                return "PAUSED"
+
             i += 1
             feedback = self.navigator.getFeedback()
             if feedback and i % 5 == 0:
@@ -625,24 +643,42 @@ class WasteDisposal(Node):
         result = self.navigator.getResult()
         if result == TaskResult.SUCCEEDED:
             self.get_logger().info("Navigation to receptacle succeeded.")
-            return True
+            return "SUCCESS"
         elif result == TaskResult.CANCELED:
             self.get_logger().warn("Navigation to receptacle was cancelled.")
-            return False
+            return "CANCELED"
         elif result == TaskResult.FAILED:
             self.get_logger().error("Navigation to receptacle failed.")
-            return False
+            return "FAILED"
         else:
             self.get_logger().error(f"Navigation to receptacle returned unknown result: {result}")
-            return False
+            return "FAILED"
 
     def execute_sequence(self):
         self.get_logger().info("Starting automatic sequence: Extraction -> Disposal")
-        self.execute_reset()
-        self.execute_extraction()
-        self.execute_go_to_receptacle()
-        self.execute_disposal()
-        self.get_logger().info("Automatic sequence completed.")
+        
+        if self._current_sequence_step == "READY":
+            self.execute_reset()
+            self._current_sequence_step = "EXTRACTION"
+        
+        if self._current_sequence_step == "EXTRACTION":
+            self.execute_extraction()
+            self._current_sequence_step = "GO_TO_RECEPTACLE"
+
+        if self._current_sequence_step == "GO_TO_RECEPTACLE":    
+            status = self.execute_go_to_receptacle(start_index=self._last_saved_waypoint)
+            if status == "PAUSED":
+                return
+            elif status != "SUCCESS":
+                self._current_sequence_step = "READY"
+                return
+            
+            self._current_sequence_step = "DISPOSAL"
+        
+        if self._current_sequence_step == "DISPOSAL":
+            self.execute_disposal()
+            self._current_sequence_step = "READY"
+            self.get_logger().info("Automatic sequence completed.")
 
     def execute_reset(self):
         self.get_logger().info("Executing reset (returning to neutral pose)...")
@@ -675,6 +711,10 @@ class WasteDisposal(Node):
     def execute_resume(self):
         self.get_logger().info("Resume requested.")
         self._is_paused = False
+
+        # spin thread back up if was in the pipeline
+        if self._current_sequence_step in ["GO_TO_RECEPTACLE", "EXTRACTION", "DISPOSAL"]:
+            threading.Thread(target=self.execute_sequence, daemon=True).start()
            
 def main(args=None):
     rclpy.init(args=args)

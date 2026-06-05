@@ -12,7 +12,7 @@
 
     <div class="controls">
       <button class="primary" onclick="executeTask('sequence')">Start Automatic Disposal</button>
-      <button class="pause" onclick="executeTask('pause')">Pause</button>
+      <button id="toggle-btn" class="pause" onclick="togglePauseResume()">Pause</button>
       <button onclick="executeTask('extraction')">Execute Extraction</button>
       <button onclick="executeTask('disposal')">Execute Disposal</button>
       <button onclick="executeTask('go_to_receptacle')">Execute Navigation</button>
@@ -67,6 +67,8 @@
 
     const statusText = document.getElementById("status");
 
+    let isPaused = false;
+
     ros.on('connection', () => {
       statusText.innerText = "Connected to Stretch";
       statusText.style.color = "#27ae60";
@@ -88,7 +90,33 @@
       });
       taskTopic.publish(msg);
       statusText.innerText = "Status: Executing " + taskType + "...";
+      
+      if (taskType === 'reset' || taskType === 'sequence') {
+        isPaused = false;
+        const btn = document.getElementById("toggle-btn");
+        btn.innerText = "Pause";
+        btn.className = "pause";
+      }      
+      
       console.log("Published task:", taskType);
+    }
+
+    function togglePauseResume() {
+      const btn = document.getElementById("toggle-btn");
+
+      if (!isPaused) {
+        // Switch to Paused state
+        isPaused= true;
+        btn.innerText = "Resume";
+        btn.className = "primary";
+        executeTask('pause');
+      } else {
+        // Switch back to Active running state
+        isPaused = false;
+        btn.innerText = "Pause";
+        btn.className = "pause";
+        executeTask('resume');
+      }
     }
   </script>
 </body>
