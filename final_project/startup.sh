@@ -28,8 +28,8 @@ tmux set-option -t "$SESSION:driver" allow-rename off
 # tmux send-keys -t "$SESSION:camera" "ros2 launch stretch_core d435i_high_resolution.launch.py" C-m
 
 # Terminal 2: camera
-# tmux new-window -t "$SESSION" -n 'camera'
-# tmux send-keys -t "$SESSION:camera" "ros2 launch stretch_core d435i_high_resolution.launch.py" C-m
+tmux new-window -t "$SESSION" -n 'camera'
+tmux send-keys -t "$SESSION:camera" "ros2 launch stretch_core d435i_high_resolution.launch.py" C-m
 
 # Terminal 3: aruco
 tmux new-window -t "$SESSION" -n 'aruco'
@@ -66,4 +66,8 @@ tmux send-keys -t "$SESSION:keyboard_teleop" "ros2 run stretch_core keyboard_tel
 # Terminal 10: cloudflare
 tmux new-window -t "$SESSION" -n 'cloudflare'
 tmux send-keys -t "$SESSION:cloudflare" "cloudflared tunnel run --token-file /home/hello-robot/kevin/cloudflare_token.txt" C-m
+
+# Terminal 10: cloudflare
+tmux new-window -t "$SESSION" -n 'trigger'
+tmux send-keys -t "$SESSION:trigger" "ros2 service call /switch_to_position_mode std_srvs/srv/Trigger" C-m
 tmux attach-session -t "$SESSION"

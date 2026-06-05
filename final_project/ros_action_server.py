@@ -543,6 +543,10 @@ class WasteDisposal(Node):
                 self.execute_named_pose_from_dict(pose)
 
         # Extraction
+        self.execute_just_extraction()
+
+    def execute_just_extraction(self):
+        # Extraction
         self.get_logger().info("Executing extraction (picking up trash)...")
         pickup_poses = self.load_poses(CAN_PICKUP_POSE_FILE)
         # Sequence: before_pickup -> (grip) -> pickup_high -> pickup_retracted
@@ -551,7 +555,7 @@ class WasteDisposal(Node):
                 self.get_logger().info(f"Executing pose: {pose_name}")
                 self.execute_named_pose_from_dict(pickup_poses[pose_name])
                 time.sleep(5.0)
-
+    
     def execute_disposal(self):
         self.switch_mode("position")
 
@@ -571,6 +575,11 @@ class WasteDisposal(Node):
                 self.send_base_goal_blocking([("translate_mobile_base", 0.7)])  # move forward
                 self.send_base_goal_blocking([("translate_mobile_base", 0.2)])  # move forward
                 time.sleep(2.0)
+
+        self.execute_just_disposal()
+    
+    def execute_just_disposal(self):
+        poses = self.load_poses(RECEPTACLE_START_POSE_FILE)
 
         # disposal is in same JSON as approach
         self.get_logger().info("Executing disposal (dropping into receptacle)...")
