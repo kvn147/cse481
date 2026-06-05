@@ -76,6 +76,16 @@ class WasteDisposal(Node):
         # Nav2 navigator
         self.navigator = BasicNavigator()
 
+        # Joint states tracking
+        self.current_tilt = 0.0
+        self.current_pan = 0.0
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            "/stretch/joint_states",
+            self.joint_states_callback,
+            10
+        )
+
         # Subscriber
         self.subscription = self.create_subscription(
             String,
@@ -88,6 +98,13 @@ class WasteDisposal(Node):
         self.navigator.waitUntilNav2Active()
 
         self.get_logger().info("Waste Disposal node started and listening to /task_execution.")
+
+    def joint_states_callback(self, msg):
+        for name, pos in zip(msg.name, msg.position):
+            if name == "joint_head_tilt":
+                self.current_tilt = pos
+            elif name == "joint_head_pan":
+                self.current_pan = pos
 
     def task_callback(self, msg):
         task_type = msg.data.strip().lower()
@@ -105,6 +122,40 @@ class WasteDisposal(Node):
         
         # Run execution in a separate background thread so rclpy.spin() doesn't deadlock
         threading.Thread(target=handler, daemon=True).start()
+
+    # --- TELEOP HANDLERS ---
+    def execute_base_forward(self):
+        self.send_base_goal_blocking([("translate_mobile_base", 0.1)], duration=2.0)
+
+    def execute_base_backward(self):
+        self.send_base_goal_blocking([("translate_mobile_base", -0.1)], duration=2.0)
+
+    def execute_base_left(self):
+        self.send_base_goal_blocking([("rotate_mobile_base", 0.2)], duration=2.0)
+
+    def execute_base_right(self):
+        self.send_base_goal_blocking([("rotate_mobile_base", -0.2)], duration=2.0)
+
+    def execute_camera_up(self):
+        new_tilt = self.current_tilt + 0.2
+        self.get_logger().info(f"Moving camera UP to {new_tilt}")
+        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration=0.5)
+
+    def execute_camera_down(self):
+        new_tilt = self.current_tilt - 0.2
+        self.get_logger().info(f"Moving camera DOWN to {new_tilt}")
+        self.send_base_goal_blocking([("joint_head_tilt", new_tilt)], duration=0.5)
+
+    def execute_camera_left(self):
+        new_pan = self.current_pan + 0.2
+        self.get_logger().info(f"Moving camera LEFT to {new_pan}")
+        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration=0.5)
+
+    def execute_camera_right(self):
+        new_pan = self.current_pan - 0.2
+        self.get_logger().info(f"Moving camera RIGHT to {new_pan}")
+        self.send_base_goal_blocking([("joint_head_pan", new_pan)], duration=0.5)
+    # -----------------------
 
     def load_poses(self, file_path):
         try:

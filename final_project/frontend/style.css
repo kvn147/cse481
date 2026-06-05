@@ -14,7 +14,7 @@ body {
     border-radius: 8px; 
     box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
     width: 100%; 
-    max-width: 600px; 
+    max-width: 800px; 
 }
 h2 { 
     color: #2c3e50; 
@@ -50,23 +50,6 @@ button.secondary {
 button.secondary:hover { 
     background-color: #7f8c8d; 
 }
-button.danger { 
-    background-color: #e74c3c; 
-    font-weight: bold; 
-    font-size: 18px;
-}
-button.danger:hover { 
-    background-color: #c0392b; 
-}
-button.warning { 
-    background-color: #f1c40f; 
-    color: #333;
-    font-weight: bold; 
-    font-size: 18px;
-}
-button.warning:hover { 
-    background-color: #f39c12; 
-}
 button.primary { 
     background-color: #2ecc71; 
     grid-column: span 2; 
@@ -76,6 +59,71 @@ button.primary {
 button.primary:hover { 
     background-color: #27ae60; 
 }
+button.pause { 
+    background-color: #eec22e; 
+    grid-column: span 2; 
+    font-weight: bold; 
+    font-size: 18px;
+}
+button.pause:hover {
+    background-color: #d0a01b; 
+}
+
+
+.teleop-side-by-side {
+    display: flex;
+    flex-direction: row;    
+    align-items: flex-start;
+    justify-content: center; 
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.control-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 150px;  
+    flex: 0 1 auto;  
+    background-color: #fcfcfc;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.portrait-camera-feed-wrapper {
+    flex: 1 1 auto;      
+    max-width: 400px;   
+    aspect-ratio: 3 / 4; 
+    background: #333; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    border-radius: 4px; 
+    overflow: hidden;  
+}
+
+.portrait-rotated-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;               
+    transform: rotate(90deg) scale(1.33);
+}
+
+.base-section-header {
+    margin-top: 25px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 5px;
+}
+.base-section-header h3 {
+    margin: 0;
+}
+.base-controls-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0;
+}
+
 .camera-feed { 
     width: 100%; 
     aspect-ratio: 4/3; 
@@ -88,9 +136,83 @@ button.primary:hover {
     color: #fff; 
     font-style: italic;
     overflow: hidden;
+    position: relative;
 }
 .camera-feed img {
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+.camera-controls-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+}
+
+.dpad {
+    display: grid;
+    grid-template-columns: 50px 50px 50px;
+    grid-template-rows: 50px 50px 50px;
+    gap: 2px;
+    background-color: #333;
+    padding: 10px;
+    border-radius: 10px;
+    width: fit-content;
+}
+
+.dpad-button {
+    width: 45px;
+    height: 45px;
+    padding: 0;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.dpad-button:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Placing the buttons */
+.up {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+  border-radius: 5px 5px 0 0;
+}
+
+.left {
+  grid-column: 1 / 2;
+  grid-row: 2 / 3;
+  border-radius: 5px 0 0 5px;
+}
+
+.right {
+  grid-column: 3 / 4;
+  grid-row: 2 / 3;
+  border-radius: 0 5px 5px 0;
+}
+
+.down {
+  grid-column: 2 / 3;
+  grid-row: 3 / 4;
+  border-radius: 0 0 5px 5px;
+}
+
+.middle {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+    object-fit: contain;
+    pointer-events: none;
 }
