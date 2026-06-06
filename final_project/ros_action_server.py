@@ -485,7 +485,7 @@ class WasteDisposal(Node):
         self.get_logger().info("Running visual servoing loop...")
         try:
             angle_to_marker = self.compute_angle_to_marker()
-            while abs(angle_to_marker) > MINIMUM_ANGLE_THRESHOLD:
+            while abs(angle_to_marker) > MINIMUM_ANGLE_THRESHOLD and not self._is_paused:
                 self.get_logger().info(f"Correcting by {angle_to_marker}...")
                 self.send_base_goal_blocking([("rotate_mobile_base", angle_to_marker)])
                 angle_to_marker = self.compute_angle_to_marker()
@@ -605,15 +605,18 @@ class WasteDisposal(Node):
                 offset_orientation_w=0.903,
             ):
                 self.execute_named_pose_from_dict(start_pose)
+                self.send_base_goal_blocking([("rotate_mobile_base", -0.1)])
                 self.send_base_goal_blocking([("translate_mobile_base", 0.7)])
                 self.send_base_goal_blocking([("translate_mobile_base", 0.7)])
+                self.send_base_goal_blocking([("translate_mobile_base", 0.2)])
                 time.sleep(2.0)
-
-        self.execute_just_disposal()
+                self.execute_just_disposal()
 
     def execute_just_disposal(self):
         poses = self.load_poses(RECEPTACLE_START_POSE_FILE)
         self.get_logger().info("Executing disposal (dropping into receptacle)...")
+        start_pose = poses["receptacle_start"]
+        self.execute_named_pose_from_dict(start_pose)
         if "receptacle_drop" in poses:
             if self._is_paused or self._abort_requested:
                 self.get_logger().warn(f"Extraction sequence aborted before executing: receptacle_drop")
