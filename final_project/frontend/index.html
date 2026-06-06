@@ -12,27 +12,48 @@
 
     <div class="controls">
       <button class="primary" onclick="executeTask('sequence')">Start Automatic Disposal</button>
-      <button id="toggle-btn" class="pause" onclick="togglePauseResume()">Pause</button>
+
+      <div class="pause-resume-row">
+        <button id="pause-btn" class="pause" onclick="doPause()">Pause</button>
+
+        <div class="split-btn-group" id="resume-group">
+          <button id="resume-main" class="primary split-main" onclick="doResume()" disabled>
+            Resume: Extraction
+          </button>
+          <button class="primary split-arrow" onclick="togglePhaseMenu(event)" disabled id="resume-arrow">▾</button>
+          <div class="phase-menu" id="phase-menu">
+            <div class="phase-label">Start sequence from…</div>
+            <button onclick="selectPhase('extraction')">🗑 Extraction</button>
+            <button onclick="selectPhase('navigation')">🧭 Navigation</button>
+            <button onclick="selectPhase('disposal')">♻️ Disposal</button>
+          </div>
+        </div>
+      </div>
+
       <button onclick="executeTask('just_extraction')">Execute Extraction</button>
       <button onclick="executeTask('just_disposal')">Execute Disposal</button>
       <button onclick="executeTask('go_to_receptacle')">Execute Navigation</button>
       <button class="secondary" onclick="executeTask('reset')">Reset Robot (Neutral Position)</button>
     </div>
-    
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-bottom: 2px solid #3498db; padding-bottom: 5px;">
-    <h3>Mission Control</h3>
-        <span id="status" style="font-family: monospace; margin-left: 5px;">Connecting...</span>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; border-bottom:2px solid #3498db; padding-bottom:5px;">
+      <h3>Mission Control</h3>
+      <span id="status" style="font-family:monospace; margin-left:5px;">Connecting...</span>
     </div>
-    
+
+    <div id="nav-pause-banner">
+      ⚠️ <strong>Navigation cancelled.</strong>
+      Please teleop the robot to the receptacle, then choose a resume phase above.
+    </div>
+
     <div class="teleop-side-by-side">
-      
       <div class="control-column-left">
-        <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #2c3e50; text-align: center;">Base Platform</h4>
+        <h4 style="margin:0 0 10px 0; font-size:14px; color:#2c3e50; text-align:center;">Base Platform</h4>
         <div class="base-controls-wrapper">
           <div class="dpad">
-            <button class="dpad-button up" onclick="executeTask('base_forward')">^</button>
-            <button class="dpad-button left" onclick="executeTask('base_left')">&lt;</button>
-            <button class="dpad-button down" onclick="executeTask('base_backward')">v</button>
+            <button class="dpad-button up"    onclick="executeTask('base_forward')">^</button>
+            <button class="dpad-button left"  onclick="executeTask('base_left')">&lt;</button>
+            <button class="dpad-button down"  onclick="executeTask('base_backward')">v</button>
             <button class="dpad-button right" onclick="executeTask('base_right')">&gt;</button>
           </div>
         </div>
@@ -40,84 +61,114 @@
 
       <div class="portrait-camera-feed-wrapper">
         <div class="camera-feed" id="video">
-            <img src="https://video.kevinn.me/stream?topic=/camera/color/image_raw" style="transform: rotate(90deg);">
+          <img src="https://video.kevinn.me/stream?topic=/camera/color/image_raw" style="transform:rotate(90deg);">
         </div>
       </div>
 
       <div class="control-column-right">
-        <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #2c3e50; text-align: center;">Camera Head</h4>
+        <h4 style="margin:0 0 10px 0; font-size:14px; color:#2c3e50; text-align:center;">Camera Head</h4>
         <div class="dpad">
-          <button class="dpad-button up" onclick="executeTask('camera_up')">^</button>
-          <button class="dpad-button left" onclick="executeTask('camera_left')">&lt;</button>
-          <button class="dpad-button down" onclick="executeTask('camera_down')">v</button>
+          <button class="dpad-button up"    onclick="executeTask('camera_up')">^</button>
+          <button class="dpad-button left"  onclick="executeTask('camera_left')">&lt;</button>
+          <button class="dpad-button down"  onclick="executeTask('camera_down')">v</button>
           <button class="dpad-button right" onclick="executeTask('camera_right')">&gt;</button>
         </div>
       </div>
+    </div>
+  </div>
 
-    </div> </div> <script>
-    const ros = new ROSLIB.Ros({
-      url: "wss://ros.kevinn.me"
-    });
+  <script>
+    const ros = new ROSLIB.Ros({ url: "wss://ros.kevinn.me" });
 
     const taskTopic = new ROSLIB.Topic({
-      ros: ros,
+      ros,
       name: "/task_execution",
       messageType: "std_msgs/String"
     });
 
-    const statusText = document.getElementById("status");
-
-    let isPaused = false;
-
-    ros.on('connection', () => {
-      statusText.innerText = "Connected to Stretch";
-      statusText.style.color = "#27ae60";
+    const statusSubTopic = new ROSLIB.Topic({
+      ros,
+      name: "/task_status",
+      messageType: "std_msgs/String"
     });
 
-    ros.on('error', (error) => {
-      statusText.innerText = "Error Connecting to Stretch";
-      statusText.style.color = "#e74c3c";
+    const statusText      = document.getElementById("status");
+    const navPauseBanner  = document.getElementById("nav-pause-banner");
+    const resumeMain      = document.getElementById("resume-main");
+    const resumeArrow     = document.getElementById("resume-arrow");
+    const phaseMenu       = document.getElementById("phase-menu");
+    const pauseBtn        = document.getElementById("pause-btn");
+
+    let isPaused        = false;
+    let selectedPhase   = "extraction";
+
+    ros.on('connection', () => { statusText.innerText = "Connected to Stretch"; statusText.style.color = "#27ae60"; });
+    ros.on('error',      () => { statusText.innerText = "Error Connecting to Stretch"; statusText.style.color = "#e74c3c"; });
+    ros.on('close',      () => { statusText.innerText = "Connection Closed"; statusText.style.color = "#f39c12"; });
+
+    statusSubTopic.subscribe((msg) => {
+      statusText.innerText = msg.data;
+      if (msg.data.startsWith("PAUSED: Navigation")) {
+        navPauseBanner.style.display = "block";
+      } else if (msg.data === "Sequence complete!") {
+        navPauseBanner.style.display = "none";
+        setResumeEnabled(false);
+      }
     });
 
-    ros.on('close', () => {
-      statusText.innerText = "Connection Closed";
-      statusText.style.color = "#f39c12";
-    });
+    function setResumeEnabled(enabled) {
+      resumeMain.disabled  = !enabled;
+      resumeArrow.disabled = !enabled;
+    }
+
+    // Fixed functional override mapping the display content correctly
+    function setPhaseLabel(phase) {
+      const labels = { extraction: "Extraction", navigation: "Navigation", disposal: "Disposal" };
+      resumeMain.textContent = "Resume: " + (labels[phase] || phase);
+    }
 
     function executeTask(taskType) {
-      const msg = new ROSLIB.Message({
-        data: taskType
-      });
-      taskTopic.publish(msg);
+      taskTopic.publish(new ROSLIB.Message({ data: taskType }));
       statusText.innerText = "Status: Executing " + taskType + "...";
-      
-      if (taskType === 'reset' || taskType === 'sequence') {
-        isPaused = false;
-        const btn = document.getElementById("toggle-btn");
-        btn.innerText = "Pause";
-        btn.className = "pause";
-      }      
-      
-      console.log("Published task:", taskType);
-    }
+      navPauseBanner.style.display = "none";
 
-    function togglePauseResume() {
-      const btn = document.getElementById("toggle-btn");
-
-      if (!isPaused) {
-        // Switch to Paused state
-        isPaused= true;
-        btn.innerText = "Resume";
-        btn.className = "primary";
-        executeTask('pause');
-      } else {
-        // Switch back to Active running state
+      if (taskType === 'sequence' || taskType === 'reset') {
         isPaused = false;
-        btn.innerText = "Pause";
-        btn.className = "pause";
-        executeTask('resume');
+        setResumeEnabled(false);
       }
     }
+
+    function doPause() {
+      if (!isPaused) {
+        isPaused = true;
+        setResumeEnabled(true);
+        executeTask('pause');
+        statusText.innerText = "Status: Paused — robot resetting to neutral...";
+      }
+    }
+
+    function doResume() {
+      if (!isPaused) return;
+      isPaused = false;
+      navPauseBanner.style.display = "none";
+      setResumeEnabled(false);
+      const msg = new ROSLIB.Message({ data: "resume:" + selectedPhase });
+      taskTopic.publish(msg);
+      statusText.innerText = "Status: Resuming from " + selectedPhase + "...";
+    }
+
+    function togglePhaseMenu(e) {
+      e.stopPropagation();
+      phaseMenu.classList.toggle("open");
+    }
+
+    function selectPhase(phase) {
+      selectedPhase = phase;
+      setPhaseLabel(phase);
+      phaseMenu.classList.remove("open");
+    }
+
+    document.addEventListener("click", () => phaseMenu.classList.remove("open"));
   </script>
 </body>
 </html>

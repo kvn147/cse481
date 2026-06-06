@@ -14,7 +14,7 @@ body {
     border-radius: 8px; 
     box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
     width: 100%; 
-    max-width: 800px; 
+    max-width: 1200px; /* Increased from 800px to give the video room to grow */
 }
 h2 { 
     color: #2c3e50; 
@@ -61,14 +61,13 @@ button.primary:hover {
 }
 button.pause { 
     background-color: #eec22e; 
-    grid-column: span 2; 
     font-weight: bold; 
     font-size: 18px;
+    width: 100%;
 }
 button.pause:hover {
     background-color: #d0a01b; 
 }
-
 
 .teleop-side-by-side {
     display: flex;
@@ -79,11 +78,12 @@ button.pause:hover {
     margin-top: 15px;
 }
 
-.control-column {
+.control-column-left,
+.control-column-right {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 150px;  
+    min-width: 120px;    /* Keeps the D-pads compact */
     flex: 0 1 auto;  
     background-color: #fcfcfc;
     border: 1px solid #eaeaea;
@@ -92,7 +92,8 @@ button.pause:hover {
 }
 
 .portrait-camera-feed-wrapper {
-    flex: 1 1 auto;      
+    flex: 3 1 auto;      /* Increased flex-grow to 3 so it takes priority over the side columns */
+    min-width: 400px;    /* Force a larger minimum size */
     max-width: 800px;   
     aspect-ratio: 3 / 4; 
     background: #333; 
@@ -215,4 +216,91 @@ button.pause:hover {
     grid-row: 2 / 3;
     object-fit: contain;
     pointer-events: none;
+}
+
+
+/* Spans the full width of the parent 2-column grid container */
+.pause-resume-row {
+    display: flex;
+    gap: 10px; 
+    grid-column: span 2;
+    width: 100%;
+}
+
+/* Standardizes structural widths within the row container */
+.pause-resume-row #pause-btn,
+.pause-resume-row #resume-group {
+    flex: 1; 
+    grid-column: auto; /* Overrides the 'span 2' inherited from global css */
+    margin: 0;
+}
+
+/* Configures the Split button framework to fill its half of the row */
+.split-btn-group {
+    display: flex; 
+    border-radius: 6px;
+    overflow: visible;
+    position: relative;
+}
+.split-btn-group .split-main {
+    border-radius: 6px 0 0 6px;
+    border-right: 1px solid rgba(255,255,255,0.35);
+    margin: 0;
+    flex: 1; 
+}
+.split-btn-group .split-arrow {
+    border-radius: 0 6px 6px 0;
+    padding: 0 14px;
+    margin: 0;
+    font-size: 12px;
+    flex-grow: 0;
+}
+.phase-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 200px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 100;
+    overflow: hidden;
+}
+.phase-menu.open { display: block; }
+.phase-menu button {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-size: 14px;
+    color: #2c3e50;
+    margin: 0;
+    border-radius: 0;
+}
+.phase-menu button:last-child { border-bottom: none; }
+.phase-menu button:hover { background: #f0f4ff; }
+.phase-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #888;
+    padding: 6px 16px 2px;
+    letter-spacing: 0.05em;
+}
+
+/* Status banner styling */
+#nav-pause-banner {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    color: #856404;
+    font-size: 14px;
 }
