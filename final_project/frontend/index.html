@@ -54,7 +54,6 @@
           <div class="phase-menu" id="phase-menu">
             <div class="phase-label">Resume sequence from…</div>
             <button onclick="selectPhase('extraction')">🗑 Extraction</button>
-            <button onclick="selectPhase('navigation')">🧭 Navigation</button>
             <button onclick="selectPhase('disposal')">♻️ Disposal</button>
           </div>
         </div>
@@ -62,7 +61,6 @@
 
       <button class="step-btn" onclick="executeTask('just_extraction')">Execute Extraction</button>
       <button class="step-btn" onclick="executeTask('just_disposal')">Execute Disposal</button>
-      <button class="step-btn" onclick="executeTask('go_to_receptacle')">Execute Navigation</button>
       <button class="secondary" onclick="executeTask('reset')">Reset Robot (Neutral Position)</button>
     </div>
 
@@ -73,7 +71,7 @@
 
     <div id="nav-pause-banner">
       ⚠️ <strong>Navigation cancelled.</strong>
-      Please teleop the robot to the receptacle, then use the dropdown arrow on the main button to select a custom phase if needed, or hit Resume.
+      Please teleop the robot to the receptacle, then use the dropdown arrow on the main button to select a custom phase.
     </div>
 
     <div class="teleop-side-by-side">
@@ -138,7 +136,6 @@
     ros.on('close',      () => { statusText.innerText = "Connection Closed"; statusText.style.color = "#f39c12"; });
 
     statusSubTopic.subscribe((msg) => {
-      statusSubTopic.subscribe((msg) => {
       statusText.innerText = msg.data;
       
       if (msg.data.startsWith("PAUSED: Navigation")) {
@@ -156,8 +153,8 @@
         }
       }
     });
-    });
 
+    // Central state machine interface update logic
     // Central state machine interface update logic
     function setSystemState(state) {
       currentSystemState = state;
@@ -170,14 +167,14 @@
         masterCtrlBtn.classList.add("state-idle");
         resumeArrow.style.display = "none";
         resumeArrow.disabled = true;
-        toggleManualStepButtons(false); // Enabled
+        toggleManualStepButtons(true); // DISABLED when idle
         
       } else if (state === "RUNNING") {
         masterCtrlBtn.innerText = "⏸ Pause Sequence";
         masterCtrlBtn.classList.add("state-running");
         resumeArrow.style.display = "none";
         resumeArrow.disabled = true;
-        toggleManualStepButtons(false); // Enabled
+        toggleManualStepButtons(true); // DISABLED when running
         
       } else if (state === "PAUSED") {
         const labels = { extraction: "Extraction", navigation: "Navigation", disposal: "Disposal" };
@@ -185,7 +182,7 @@
         masterCtrlBtn.classList.add("state-paused");
         resumeArrow.style.display = "block";
         resumeArrow.disabled = false;
-        toggleManualStepButtons(true); // Greyed out / Disabled
+        toggleManualStepButtons(false); // ENABLED only when paused
       }
     }
 
