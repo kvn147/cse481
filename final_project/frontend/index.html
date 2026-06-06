@@ -5,24 +5,54 @@
   <title>Automatic Waste Disposal</title>
   <script src="https://cdn.jsdelivr.net/npm/roslib/build/roslib.min.js"></script>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* New styling for the stateful master toggle button */
+    .master-btn-container {
+      grid-column: span 2;
+      display: flex;
+      gap: 10px;
+    }
+    
+    #master-control-btn {
+      flex: 1;
+      font-weight: bold;
+      font-size: 18px;
+      transition: background-color 0.3s ease;
+    }
+
+    /* Functional UI states for the master toggle */
+    #master-control-btn.state-idle { background-color: #2ecc71; }
+    #master-control-btn.state-idle:hover { background-color: #27ae60; }
+    
+    #master-control-btn.state-running { background-color: #f1c40f; color: #2c3e50; }
+    #master-control-btn.state-running:hover { background-color: #d4ac0d; }
+    
+    #master-control-btn.state-paused { background-color: #3498db; }
+    #master-control-btn.state-paused:hover { background-color: #2980b9; }
+
+    /* Visual feedback for disabled manual step-execution buttons */
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background-color: #bdc3c7 !important;
+      color: #7f8c8d !important;
+      transform: none !important;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
     <h2>Automatic Waste Disposal System</h2>
 
     <div class="controls">
-      <button class="primary" onclick="executeTask('sequence')">Start Automatic Disposal</button>
-
-      <div class="pause-resume-row">
-        <button id="pause-btn" class="pause" onclick="doPause()">Pause</button>
-
-        <div class="split-btn-group" id="resume-group">
-          <button id="resume-main" class="primary split-main" onclick="doResume()" disabled>
-            Resume: Extraction
+      <div class="master-btn-container">
+        <div class="split-btn-group" id="resume-group" style="width: 100%;">
+          <button id="master-control-btn" class="state-idle" onclick="handleMasterToggle()">
+            ▶ Start Automatic Disposal
           </button>
-          <button class="primary split-arrow" onclick="togglePhaseMenu(event)" disabled id="resume-arrow">▾</button>
+          <button id="resume-arrow" class="primary split-arrow" onclick="togglePhaseMenu(event)" disabled style="display: none;">▾</button>
           <div class="phase-menu" id="phase-menu">
-            <div class="phase-label">Start sequence from…</div>
+            <div class="phase-label">Resume sequence from…</div>
             <button onclick="selectPhase('extraction')">🗑 Extraction</button>
             <button onclick="selectPhase('navigation')">🧭 Navigation</button>
             <button onclick="selectPhase('disposal')">♻️ Disposal</button>
@@ -30,9 +60,9 @@
         </div>
       </div>
 
-      <button onclick="executeTask('just_extraction')">Execute Extraction</button>
-      <button onclick="executeTask('just_disposal')">Execute Disposal</button>
-      <button onclick="executeTask('go_to_receptacle')">Execute Navigation</button>
+      <button class="step-btn" onclick="executeTask('just_extraction')">Execute Extraction</button>
+      <button class="step-btn" onclick="executeTask('just_disposal')">Execute Disposal</button>
+      <button class="step-btn" onclick="executeTask('go_to_receptacle')">Execute Navigation</button>
       <button class="secondary" onclick="executeTask('reset')">Reset Robot (Neutral Position)</button>
     </div>
 
@@ -43,7 +73,7 @@
 
     <div id="nav-pause-banner">
       ⚠️ <strong>Navigation cancelled.</strong>
-      Please teleop the robot to the receptacle, then choose a resume phase above.
+      Please teleop the robot to the receptacle, then use the dropdown arrow on the main button to select a custom phase if needed, or hit Resume.
     </div>
 
     <div class="teleop-side-by-side">
@@ -94,37 +124,97 @@
 
     const statusText      = document.getElementById("status");
     const navPauseBanner  = document.getElementById("nav-pause-banner");
-    const resumeMain      = document.getElementById("resume-main");
-    const resumeArrow     = document.getElementById("resume-arrow");
     const phaseMenu       = document.getElementById("phase-menu");
-    const pauseBtn        = document.getElementById("pause-btn");
+    const masterCtrlBtn   = document.getElementById("master-control-btn");
+    const resumeArrow     = document.getElementById("resume-arrow");
+    const stepButtons     = document.querySelectorAll(".step-btn");
 
-    let isPaused        = false;
-    let selectedPhase   = "extraction";
+    // Execution States: "IDLE", "RUNNING", "PAUSED"
+    let currentSystemState = "IDLE";
+    let selectedPhase      = "extraction";
 
     ros.on('connection', () => { statusText.innerText = "Connected to Stretch"; statusText.style.color = "#27ae60"; });
     ros.on('error',      () => { statusText.innerText = "Error Connecting to Stretch"; statusText.style.color = "#e74c3c"; });
     ros.on('close',      () => { statusText.innerText = "Connection Closed"; statusText.style.color = "#f39c12"; });
 
     statusSubTopic.subscribe((msg) => {
+      statusSubTopic.subscribe((msg) => {
       statusText.innerText = msg.data;
+      
       if (msg.data.startsWith("PAUSED: Navigation")) {
         navPauseBanner.style.display = "block";
+        // Ensure the UI enters the paused state if Nav2 interrupts itself
+        setSystemState("PAUSED"); 
+        
       } else if (msg.data === "Sequence complete!") {
         navPauseBanner.style.display = "none";
-        setResumeEnabled(false);
+        
+        // FIX: Only transition back to Start/IDLE if the sequence was actually running.
+        // This ignores the false "Sequence complete!" message the backend fires during a Pause reset.
+        if (currentSystemState === "RUNNING") {
+          setSystemState("IDLE");
+        }
       }
     });
+    });
 
-    function setResumeEnabled(enabled) {
-      resumeMain.disabled  = !enabled;
-      resumeArrow.disabled = !enabled;
+    // Central state machine interface update logic
+    function setSystemState(state) {
+      currentSystemState = state;
+      
+      // Reset classes
+      masterCtrlBtn.className = "";
+      
+      if (state === "IDLE") {
+        masterCtrlBtn.innerText = "▶ Start Automatic Disposal";
+        masterCtrlBtn.classList.add("state-idle");
+        resumeArrow.style.display = "none";
+        resumeArrow.disabled = true;
+        toggleManualStepButtons(false); // Enabled
+        
+      } else if (state === "RUNNING") {
+        masterCtrlBtn.innerText = "⏸ Pause Sequence";
+        masterCtrlBtn.classList.add("state-running");
+        resumeArrow.style.display = "none";
+        resumeArrow.disabled = true;
+        toggleManualStepButtons(false); // Enabled
+        
+      } else if (state === "PAUSED") {
+        const labels = { extraction: "Extraction", navigation: "Navigation", disposal: "Disposal" };
+        masterCtrlBtn.innerText = "🔄 Resume: " + (labels[selectedPhase] || selectedPhase);
+        masterCtrlBtn.classList.add("state-paused");
+        resumeArrow.style.display = "block";
+        resumeArrow.disabled = false;
+        toggleManualStepButtons(true); // Greyed out / Disabled
+      }
     }
 
-    // Fixed functional override mapping the display content correctly
-    function setPhaseLabel(phase) {
-      const labels = { extraction: "Extraction", navigation: "Navigation", disposal: "Disposal" };
-      resumeMain.textContent = "Resume: " + (labels[phase] || phase);
+    function toggleManualStepButtons(shouldDisable) {
+      stepButtons.forEach(btn => {
+        btn.disabled = shouldDisable;
+      });
+    }
+
+    function handleMasterToggle() {
+      if (currentSystemState === "IDLE") {
+        // Trigger initial automation pipeline
+        executeTask('sequence');
+        setSystemState("RUNNING");
+        
+      } else if (currentSystemState === "RUNNING") {
+        // Intercept pipeline execution, halting movements via action client overrides
+        setSystemState("PAUSED");
+        executeTask('pause');
+        statusText.innerText = "Status: Paused — robot resetting to neutral...";
+        
+      } else if (currentSystemState === "PAUSED") {
+        // Dispatch targeted recovery entry point frame back onto backend task processor
+        navPauseBanner.style.display = "none";
+        const msg = new ROSLIB.Message({ data: "resume:" + selectedPhase });
+        taskTopic.publish(msg);
+        statusText.innerText = "Status: Resuming from " + selectedPhase + "...";
+        setSystemState("RUNNING");
+      }
     }
 
     function executeTask(taskType) {
@@ -133,28 +223,8 @@
       navPauseBanner.style.display = "none";
 
       if (taskType === 'sequence' || taskType === 'reset') {
-        isPaused = false;
-        setResumeEnabled(false);
+        setSystemState(taskType === 'sequence' ? "RUNNING" : "IDLE");
       }
-    }
-
-    function doPause() {
-      if (!isPaused) {
-        isPaused = true;
-        setResumeEnabled(true);
-        executeTask('pause');
-        statusText.innerText = "Status: Paused — robot resetting to neutral...";
-      }
-    }
-
-    function doResume() {
-      if (!isPaused) return;
-      isPaused = false;
-      navPauseBanner.style.display = "none";
-      setResumeEnabled(false);
-      const msg = new ROSLIB.Message({ data: "resume:" + selectedPhase });
-      taskTopic.publish(msg);
-      statusText.innerText = "Status: Resuming from " + selectedPhase + "...";
     }
 
     function togglePhaseMenu(e) {
@@ -164,7 +234,9 @@
 
     function selectPhase(phase) {
       selectedPhase = phase;
-      setPhaseLabel(phase);
+      if (currentSystemState === "PAUSED") {
+        setSystemState("PAUSED"); // Forces re-render of text string label
+      }
       phaseMenu.classList.remove("open");
     }
 
